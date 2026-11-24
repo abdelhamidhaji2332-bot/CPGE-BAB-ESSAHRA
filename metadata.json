@@ -1,0 +1,8 @@
+{
+  "name": "Site Prépa",
+  "description": "Plateforme numérique du campus CPGE marocain — Ressources pédagogiques, colloscopes, emplois du temps, internat, vie étudiante et espaces de classe en temps réel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
