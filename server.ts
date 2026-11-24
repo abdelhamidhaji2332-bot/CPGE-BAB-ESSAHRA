@@ -10,6 +10,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { z } from 'zod';
 import {
   canAccessClassWorkspace,
+  canManageAdministration,
   canManageCampusLife,
   canManageInternat,
   canManageProfTools,
@@ -38,7 +39,6 @@ import {
 const PORT = 3000;
 const PUBLIC_DIR = path.resolve(process.cwd(), 'public');
 const DOCS_ROOT = path.resolve(PUBLIC_DIR, 'documents');
-const SUBMISSIONS_ROOT = path.resolve(process.cwd(), 'data', 'submissions');
 
 const ALLOWED_ROLES: UserRole[] = [
   'etudiant',
@@ -51,9 +51,12 @@ const ALLOWED_ROLES: UserRole[] = [
 ];
 
 const ALLOWED_DOC_CATEGORIES: DocumentCategory[] = [
-  'cours',
   'td',
   'ds',
+  'resume',
+  'cnc',
+  'cf',
+  'cours',
   'concours-blancs',
   'corriges',
   'colloscopes',
@@ -92,7 +95,6 @@ interface WsClientMeta {
 
 async function startServer(): Promise<void> {
   fs.mkdirSync(PUBLIC_DIR, { recursive: true });
-  fs.mkdirSync(SUBMISSIONS_ROOT, { recursive: true });
 
   const db = getDb();
   await seedCampusDatabase(PUBLIC_DIR);
@@ -466,6 +468,7 @@ async function startServer(): Promise<void> {
   app.get('/api/documents', optionalAuth, (req: AuthenticatedRequest, res) => {
     const classCode = typeof req.query.classCode === 'string' ? req.query.classCode.toUpperCase() : '';
     const category = typeof req.query.category === 'string' ? req.query.category : '';
+    const scope = typeof req.query.scope === 'string' ? req.query.scope : '';
     const subjectSlug = typeof req.query.subjectSlug === 'string' ? req.query.subjectSlug : '';
     const q = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : '';
 
@@ -481,6 +484,8 @@ async function startServer(): Promise<void> {
     if (category && ALLOWED_DOC_CATEGORIES.includes(category as DocumentCategory)) {
       conditions.push('d.category = ?');
       params.push(category);
+    } else if (scope === 'ressources') {
+      conditions.push(`d.category IN ('td', 'ds', 'resume', 'cnc', 'cf')`);
     }
     if (subjectSlug) {
       conditions.push('d.subject_slug = ?');
@@ -530,7 +535,7 @@ async function startServer(): Promise<void> {
   app.post('/api/documents/upload', requireAuth, upload.single('file'), (req: AuthenticatedRequest, res) => {
     const file = req.file;
     const classCodeRaw = typeof req.body.classCode === 'string' ? req.body.classCode.toUpperCase() : '';
-    const category = typeof req.body.category === 'string' ? (req.body.category as DocumentCategory) : 'cours';
+    const category = typeof req.body.category === 'string' ? (req.body.category as DocumentCategory) : 'td';
     const subjectSlug = typeof req.body.subjectSlug === 'string' ? req.body.subjectSlug.trim() : '';
     const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
     const chapter = typeof req.body.chapter === 'string' ? req.body.chapter.trim() : '';
@@ -554,7 +559,7 @@ async function startServer(): Promise<void> {
       }
     } else if (!canManageProfTools(req.user!)) {
       res.status(403).json({
-        error: 'Seuls les professeurs (et l’administration) peuvent publier les cours, TD, DS et supports pédagogiques.',
+        error: 'Seuls les professeurs (et l’administration) peuvent publier les TD, DS, résumés, CNC et CF.',
       });
       return;
     }
@@ -1263,179 +1268,142 @@ async function startServer(): Promise<void> {
     res.json({ event: updated });
   });
 
-  // ─── Espace Professeur & Remise de TP Informatique ───────────────────────
-  app.get('/api/informatique/assignments', optionalAuth, (req: AuthenticatedRequest, res) => {
-    const classCode = typeof req.query.classCode === 'string' ? req.query.classCode.toUpperCase() : '';
-    const params: unknown[] = [];
-    let where = '';
-    if (classCode && isValidClassCode(classCode)) {
-      where = 'WHERE class_code = ?';
-      params.push(classCode);
-    }
-    const assignments = db
-      .prepare(`SELECT * FROM info_assignments ${where} ORDER BY created_at DESC, id DESC`)
-      .all(...params) as Array<Record<string, unknown>>;
-
-    const enriched = assignments.map((a) => {
-      const aid = Number(a.id);
-      if (!req.user) {
-        return { ...a, mySubmission: null, submissions: [] };
-      }
-      if (canManageProfTools(req.user)) {
-        const subs = db
-          .prepare('SELECT * FROM info_submissions WHERE assignment_id = ? ORDER BY submitted_at DESC')
-          .all(aid);
-        return { ...a, mySubmission: null, submissions: subs };
-      }
-      const mine = db
-        .prepare('SELECT * FROM info_submissions WHERE assignment_id = ? AND student_id = ?')
-        .get(aid, req.user.id);
-      return { ...a, mySubmission: mine ?? null, submissions: [] };
-    });
-
-    res.json({ assignments: enriched });
+  // ─── Administration — Annonces Officielles ──────────────────────────────
+  app.get('/api/administration/announcements', (_req, res) => {
+    const announcements = db
+      .prepare(
+        `SELECT * FROM admin_announcements
+         ORDER BY is_pinned DESC, created_at DESC, id DESC`
+      )
+      .all();
+    res.json({ announcements });
   });
 
-  const assignmentSchema = z.object({
-    classCode: z.enum(['MPSI', 'PCSI1', 'PCSI2', 'ECS', 'MP', 'PSI1', 'PSI2', '2ECS']),
-    title: z.string().trim().min(3).max(140),
-    description: z.string().trim().min(5).max(3000),
-    dueDate: z.string().trim().min(2).max(60),
-    language: z.string().trim().min(2).max(40).optional(),
+  const adminAnnouncementSchema = z.object({
+    category: z.enum([
+      'Note officielle',
+      'Concours & Examens',
+      'Scolarité',
+      'Bourses & Internat',
+      'Urgent',
+    ]),
+    targetAudience: z.string().trim().min(2).max(80).optional(),
+    title: z.string().trim().min(3).max(160),
+    content: z.string().trim().min(3).max(4000),
+    isPinned: z.boolean().optional(),
   });
 
-  app.post('/api/informatique/assignments', requireAuth, (req: AuthenticatedRequest, res) => {
-    if (!canManageProfTools(req.user!)) {
-      res.status(403).json({ error: 'Création de TP réservée aux professeurs et à l’administration.' });
+  app.post('/api/administration/announcements', requireAuth, (req: AuthenticatedRequest, res) => {
+    if (!canManageAdministration(req.user!)) {
+      res.status(403).json({
+        error: 'Publication réservée à l’Administration du Centre CPGE.',
+      });
       return;
     }
-    const parsed = assignmentSchema.safeParse(req.body);
+    const parsed = adminAnnouncementSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Paramètres de travail informatique invalides.' });
+      res.status(400).json({ error: 'Champs de l’annonce officielle invalides.' });
       return;
     }
     const result = db
       .prepare(
-        `INSERT INTO info_assignments (class_code, title, description, language, due_date, created_by, professor_name)
+        `INSERT INTO admin_announcements (category, target_audience, title, content, is_pinned, author_id, author_name)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
-        parsed.data.classCode,
+        parsed.data.category,
+        parsed.data.targetAudience || 'Toutes les classes',
         parsed.data.title,
-        parsed.data.description,
-        parsed.data.language ?? 'Python 3',
-        parsed.data.dueDate,
+        parsed.data.content,
+        parsed.data.isPinned ? 1 : 0,
         req.user!.id,
         req.user!.fullName
       );
-    const created = db.prepare('SELECT * FROM info_assignments WHERE id = ?').get(Number(result.lastInsertRowid)) as Record<string, unknown>;
-    recordClassActivity(
-      parsed.data.classCode,
-      'assignment',
-      `Nouveau TP Python : ${parsed.data.title}`,
-      'bibliotheque',
-      req.user!.id
-    );
-    res.status(201).json({ assignment: { ...created, mySubmission: null, submissions: [] } });
+    const announcement = db
+      .prepare('SELECT * FROM admin_announcements WHERE id = ?')
+      .get(Number(result.lastInsertRowid));
+    res.status(201).json({ announcement });
   });
 
-  const submissionSchema = z.object({
-    fileName: z.string().trim().min(1).max(120),
-    codeContent: z.string().trim().min(1).max(50000),
+  const adminAnnouncementPatchSchema = z.object({
+    category: z
+      .enum([
+        'Note officielle',
+        'Concours & Examens',
+        'Scolarité',
+        'Bourses & Internat',
+        'Urgent',
+      ])
+      .optional(),
+    targetAudience: z.string().trim().min(2).max(80).optional(),
+    title: z.string().trim().min(3).max(160).optional(),
+    content: z.string().trim().min(3).max(4000).optional(),
+    isPinned: z.boolean().optional(),
   });
 
-  app.post('/api/informatique/assignments/:id/submit', requireAuth, (req: AuthenticatedRequest, res) => {
-    const assignmentId = Number(req.params.id);
-    if (!Number.isInteger(assignmentId)) {
-      res.status(400).json({ error: 'Identifiant de TP invalide.' });
+  app.patch('/api/administration/announcements/:id', requireAuth, (req: AuthenticatedRequest, res) => {
+    if (!canManageAdministration(req.user!)) {
+      res.status(403).json({
+        error: 'Modification réservée à l’Administration du Centre CPGE.',
+      });
       return;
     }
-    const assign = db
-      .prepare('SELECT id, class_code FROM info_assignments WHERE id = ?')
-      .get(assignmentId) as { id: number; class_code: string } | undefined;
-    if (!assign) {
-      res.status(404).json({ error: 'Devoir informatique introuvable.' });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: 'Identifiant invalide.' });
       return;
     }
-    if (!canAccessClassWorkspace(req.user!, assign.class_code)) {
-      res.status(403).json({ error: `Ce dépôt est réservé aux élèves de ${assign.class_code}.` });
+    const existing = db
+      .prepare('SELECT * FROM admin_announcements WHERE id = ?')
+      .get(id) as
+      | {
+          id: number;
+          category: string;
+          target_audience: string;
+          title: string;
+          content: string;
+          is_pinned: number;
+        }
+      | undefined;
+    if (!existing) {
+      res.status(404).json({ error: 'Annonce administrative introuvable.' });
       return;
     }
-    const parsed = submissionSchema.safeParse(req.body);
+    const parsed = adminAnnouncementPatchSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: 'Nom de fichier et code Python requis.' });
+      res.status(400).json({ error: 'Paramètres de mise à jour invalides.' });
       return;
     }
-
-    const safeName = sanitizeFileSegment(parsed.data.fileName);
-    const targetPath = resolveInside(
-      SUBMISSIONS_ROOT,
-      assign.class_code,
-      String(assignmentId),
-      `${req.user!.id}-${safeName}`
-    );
-    if (!targetPath) {
-      res.status(400).json({ error: 'Nom de fichier invalide.' });
-      return;
-    }
-    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    fs.writeFileSync(targetPath, parsed.data.codeContent, 'utf8');
-
     db.prepare(
-      `INSERT INTO info_submissions (assignment_id, student_id, student_name, file_name, file_path, code_content, status, submitted_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'soumis', datetime('now'))
-       ON CONFLICT(assignment_id, student_id) DO UPDATE SET
-         file_name = excluded.file_name,
-         file_path = excluded.file_path,
-         code_content = excluded.code_content,
-         status = 'soumis',
-         submitted_at = datetime('now')`
+      `UPDATE admin_announcements
+       SET category = ?, target_audience = ?, title = ?, content = ?, is_pinned = ?, updated_at = datetime('now')
+       WHERE id = ?`
     ).run(
-      assignmentId,
-      req.user!.id,
-      req.user!.fullName,
-      parsed.data.fileName,
-      targetPath,
-      parsed.data.codeContent
+      parsed.data.category ?? existing.category,
+      parsed.data.targetAudience ?? existing.target_audience,
+      parsed.data.title ?? existing.title,
+      parsed.data.content ?? existing.content,
+      typeof parsed.data.isPinned === 'boolean' ? (parsed.data.isPinned ? 1 : 0) : existing.is_pinned,
+      id
     );
-
-    const submission = db
-      .prepare('SELECT * FROM info_submissions WHERE assignment_id = ? AND student_id = ?')
-      .get(assignmentId, req.user!.id);
-    res.status(201).json({ submission });
+    const updated = db.prepare('SELECT * FROM admin_announcements WHERE id = ?').get(id);
+    res.json({ announcement: updated });
   });
 
-  const reviewSubSchema = z.object({
-    status: z.enum(['soumis', 'revu', 'valide']),
-    professorFeedback: z.string().trim().max(2000),
-  });
-
-  app.patch('/api/informatique/submissions/:id/review', requireAuth, (req: AuthenticatedRequest, res) => {
-    if (!canManageProfTools(req.user!)) {
-      res.status(403).json({ error: 'Évaluation réservée aux professeurs et à l’administration.' });
+  app.delete('/api/administration/announcements/:id', requireAuth, (req: AuthenticatedRequest, res) => {
+    if (!canManageAdministration(req.user!)) {
+      res.status(403).json({
+        error: 'Suppression réservée à l’Administration du Centre CPGE.',
+      });
       return;
     }
-    const subId = Number(req.params.id);
-    if (!Number.isInteger(subId)) {
-      res.status(400).json({ error: 'Identifiant de rendu invalide.' });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      res.status(400).json({ error: 'Identifiant invalide.' });
       return;
     }
-    const parsed = reviewSubSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: 'Données de correction invalides.' });
-      return;
-    }
-    db.prepare(`UPDATE info_submissions SET status = ?, professor_feedback = ? WHERE id = ?`).run(
-      parsed.data.status,
-      parsed.data.professorFeedback,
-      subId
-    );
-    const updated = db.prepare('SELECT * FROM info_submissions WHERE id = ?').get(subId);
-    if (!updated) {
-      res.status(404).json({ error: 'Rendu introuvable.' });
-      return;
-    }
-    res.json({ submission: updated });
+    db.prepare('DELETE FROM admin_announcements WHERE id = ?').run(id);
+    res.json({ ok: true });
   });
 
   // ─── Vite Dev Middleware or Static Production Build ──────────────────────

@@ -2,7 +2,7 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Site Prépa — Plateforme Numérique du Campus CPGE</title>
     <meta name="description" content="Plateforme numérique du campus CPGE marocain — Ressources pédagogiques, colloscopes, emplois du temps, internat, vie étudiante et espaces de classe en temps réel." />
     <meta property="og:title" content="Site Prépa — Plateforme Numérique du Campus CPGE" />
@@ -10,11 +10,31 @@
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="theme-color" content="#a8532c" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Site Prépa" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..600&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('siteprepa-theme');
+          if (t === 'dark') {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.colorScheme = 'dark';
+            var m = document.querySelector('meta[name="theme-color"]');
+            if (m) m.setAttribute('content', '#12100e');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body class="bg-[#f7ead0] text-[#4a2e1a] antialiased selection:bg-[#a8532c]/20 selection:text-[#4a2e1a]">
+  <body class="bg-[#f7ead0] text-[#4a2e1a] antialiased selection:bg-[#a8532c]/20 selection:text-[#4a2e1a] dark:bg-[#12100e] dark:text-[#f5ebd6] dark:selection:bg-[#e88c5d]/25 dark:selection:text-[#f5ebd6]">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

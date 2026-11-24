@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --light: #f7ead0;
@@ -10,26 +11,72 @@
   --card-surface-alt: #f3dfb9;
   --border-warm: rgba(168, 83, 44, 0.22);
   --border-warm-strong: rgba(168, 83, 44, 0.48);
+
+  --bg-canvas: #f7ead0;
+  --bg-surface: #fcf4e4;
+  --bg-surface-alt: #f3dfb9;
+  --bg-sand: #e6c58c;
+  --text-ink: #4a2e1a;
+  --text-accent: #a8532c;
+  --border-dune: #c98f4f;
+  --accent-solid: #a8532c;
+  --accent-solid-text: #f7ead0;
+  --topbar-bg: linear-gradient(90deg, #a8532c, #c98f4f);
+  --topbar-text: #f7ead0;
+  --footer-bg: #4a2e1a;
+  --footer-text: #e6c58c;
+
   --font-display: "Playfair Display", Georgia, serif;
   --font-serif: Georgia, "Playfair Display", serif;
   --font-sans: "DM Sans", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+.dark {
+  --light: #12100e;
+  --sand: #25201b;
+  --dune: #8b6642;
+  --rust: #e88c5d;
+  --dark: #f5ebd6;
+  --card-surface: #1c1916;
+  --card-surface-alt: #26211c;
+  --border-warm: rgba(232, 140, 93, 0.22);
+  --border-warm-strong: rgba(232, 140, 93, 0.55);
+
+  --bg-canvas: #12100e;
+  --bg-surface: #1c1916;
+  --bg-surface-alt: #26211c;
+  --bg-sand: #27221c;
+  --text-ink: #f5ebd6;
+  --text-accent: #e88c5d;
+  --border-dune: #5a4634;
+  --accent-solid: #c25e32;
+  --accent-solid-text: #fdf6e9;
+  --topbar-bg: linear-gradient(90deg, #1d1612, #2d2118);
+  --topbar-text: #f5ebd6;
+  --footer-bg: #0b0a09;
+  --footer-text: #d6c4a5;
+}
+
 @layer base {
   html {
-    background-color: var(--light);
-    color: var(--dark);
+    background-color: var(--bg-canvas);
+    color: var(--text-ink);
     font-family: var(--font-serif);
     scroll-behavior: smooth;
   }
 
   body {
-    background-color: var(--light);
-    color: var(--dark);
+    background-color: var(--bg-canvas);
+    color: var(--text-ink);
     font-family: var(--font-serif);
     line-height: 1.75;
     overflow-x: hidden;
+    transition: background-color 180ms ease, color 180ms ease;
+  }
+
+  .dark body {
+    letter-spacing: 0.008em;
   }
 
   h1, h2, h3, h4, .font-display {
@@ -43,24 +90,25 @@
 
 /* Signature style_65af19b7.css components */
 .topbar {
-  background: linear-gradient(90deg, var(--rust), var(--dune));
-  color: var(--light);
+  background: var(--topbar-bg);
+  color: var(--topbar-text);
+  border-bottom: 1px solid var(--border-warm);
 }
 
 .sand-nav {
-  background: var(--sand);
-  border-bottom: 3px solid var(--dune);
+  background: var(--bg-sand);
+  border-bottom: 3px solid var(--border-dune);
 }
 
 .sand-nav-link {
-  color: var(--dark);
+  color: var(--text-ink);
   transition: background-color 180ms ease, color 180ms ease;
 }
 
 .sand-nav-link:hover,
 .sand-nav-link.active {
-  background: var(--rust);
-  color: var(--light);
+  background: var(--accent-solid);
+  color: var(--accent-solid-text);
 }
 
 .dune-heading::after {
@@ -68,12 +116,12 @@
   display: block;
   width: 44px;
   height: 3px;
-  background: var(--dune);
+  background: var(--border-dune);
   margin-top: 8px;
 }
 
 .dune-card {
-  background: var(--card-surface);
+  background: var(--bg-surface);
   border: 1px solid var(--border-warm);
   border-radius: 12px;
   transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease;
@@ -84,9 +132,9 @@
 }
 
 .btn-rust {
-  background: var(--rust);
-  color: var(--light);
-  border: 1px solid var(--rust);
+  background: var(--accent-solid);
+  color: var(--accent-solid-text);
+  border: 1px solid var(--accent-solid);
   transition: filter 180ms ease, transform 180ms ease;
 }
 
@@ -95,50 +143,50 @@
 }
 
 .btn-sand {
-  background: var(--sand);
-  color: var(--dark);
-  border: 1px solid var(--dune);
+  background: var(--bg-sand);
+  color: var(--text-ink);
+  border: 1px solid var(--border-dune);
   transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
 }
 
 .btn-sand:hover {
-  background: var(--dune);
-  color: var(--light);
+  background: var(--border-dune);
+  color: var(--accent-solid-text);
 }
 
 .btn-outline-light {
   padding: 6px 16px;
-  border: 2px solid var(--light);
+  border: 2px solid var(--topbar-text);
   border-radius: 20px;
   background: transparent;
-  color: var(--light);
+  color: var(--topbar-text);
   transition: background-color 180ms ease, color 180ms ease;
 }
 
 .btn-outline-light:hover {
-  background: var(--light);
-  color: var(--rust);
+  background: var(--topbar-text);
+  color: var(--accent-solid);
 }
 
 .dunes-footer {
-  background: var(--dark);
-  color: var(--sand);
+  background: var(--footer-bg);
+  color: var(--footer-text);
 }
 
 .subnav {
-  background: var(--card-surface);
-  border-bottom: 2px solid var(--sand);
+  background: var(--bg-surface);
+  border-bottom: 2px solid var(--bg-sand);
 }
 
 .subnav-link {
-  color: var(--dark);
+  color: var(--text-ink);
   transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
 }
 
 .subnav-link:hover,
 .subnav-link.active {
-  background: var(--sand);
-  color: var(--rust);
+  background: var(--bg-sand);
+  color: var(--text-accent);
 }
 
 html[lang="ar"] body {
@@ -152,16 +200,30 @@ html[lang="ar"] body {
 .no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 
+.pb-safe {
+  padding-bottom: max(0.35rem, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 639px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
+  body,
   .sand-nav-link,
   .subnav-link,
   .dune-card,

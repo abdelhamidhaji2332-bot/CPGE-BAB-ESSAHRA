@@ -2,6 +2,7 @@ import { ArrowRight, KeyRound, Lock, LogOut, Shield, UserCheck } from 'lucide-re
 import React, { useState } from 'react';
 import { GlowCard } from '../components/GlowCard';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { ROLE_LABELS } from '../shared/curriculum';
 
 export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void }) {
@@ -14,6 +15,7 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
     loginWithAdminPasscode,
     logout,
   } = useAuth();
+  const toast = useToast();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,7 +35,9 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
     try {
       await login(email, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur de connexion.');
+      const msg = err instanceof Error ? err.message : 'Erreur de connexion.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -50,7 +54,9 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
         password: adminPassword,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Impossible d’activer le compte Équipe Dev.');
+      const msg = err instanceof Error ? err.message : 'Impossible d’activer le compte Équipe Dev.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -63,7 +69,9 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
     try {
       await loginWithAdminPasscode(adminPasscode);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Code Équipe Dev refusé.');
+      const msg = err instanceof Error ? err.message : 'Code Équipe Dev refusé.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -71,29 +79,29 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
 
   if (user) {
     return (
-      <div className="bg-[#f7ead0] py-12 text-[#4a2e1a]">
-        <div className="mx-auto max-w-5xl px-5 sm:px-6">
-          <div className="flex flex-col justify-between gap-6 border-b-2 border-[#e6c58c] pb-8 sm:flex-row sm:items-end">
+      <div className="bg-[#f7ead0] py-6 text-[#4a2e1a] dark:bg-[#12100e] dark:text-[#f5ebd6] sm:py-12">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6">
+          <div className="flex flex-col justify-between gap-4 border-b-2 border-[#e6c58c] pb-6 dark:border-[#332920] sm:flex-row sm:items-end sm:gap-6 sm:pb-8">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-[#a8532c]">
+              <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-[#a8532c] dark:text-[#e88c5d]">
                 Session Campus Active · {ROLE_LABELS[user.role]}
               </p>
-              <h1 className="dune-heading mt-2 font-display text-3xl font-semibold text-[#a8532c]">
+              <h1 className="dune-heading mt-1.5 sm:mt-2 font-display text-2xl sm:text-3xl font-semibold text-[#a8532c] dark:text-[#e88c5d]">
                 {user.fullName}
               </h1>
-              <p className="mt-2 text-sm text-[#4a2e1a]/80">
+              <p className="mt-2 text-xs sm:text-sm text-[#4a2e1a]/80 dark:text-[#e3d4b7]">
                 {user.email}
                 {user.classCode ? ` · Classe ${user.classCode}` : ''}
                 {user.trinomeNumber ? ` · Trinôme ${user.trinomeNumber}` : ''}
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
               {user.role === 'admin' ? (
                 <button
                   type="button"
                   onClick={() => onNavigate('/dev-team')}
-                  className="btn-rust inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold cursor-pointer"
+                  className="btn-rust inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold cursor-pointer sm:min-h-0"
                 >
                   <Shield className="h-3.5 w-3.5" />
                   Ouvrir le Panneau Équipe Dev
@@ -103,7 +111,7 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
                 <button
                   type="button"
                   onClick={() => onNavigate(`/classes/${user.classCode}`)}
-                  className="btn-rust inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold cursor-pointer"
+                  className="btn-rust inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold cursor-pointer sm:min-h-0"
                 >
                   Espace {user.classCode}
                   <ArrowRight className="h-3.5 w-3.5" />
@@ -112,7 +120,7 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
               <button
                 type="button"
                 onClick={logout}
-                className="btn-sand inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-medium cursor-pointer"
+                className="btn-sand inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-medium cursor-pointer sm:min-h-0"
               >
                 <LogOut className="h-3.5 w-3.5" />
                 Déconnexion
@@ -120,31 +128,40 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
             </div>
           </div>
 
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <GlowCard onClick={() => onNavigate('/classes')} className="p-5">
-              <p className="text-xs font-medium text-[#a8532c]">Classes</p>
-              <h2 className="mt-1.5 font-display text-base font-semibold text-[#4a2e1a]">
+              <p className="text-xs font-medium text-[#a8532c] dark:text-[#e88c5d]">Classes</p>
+              <h2 className="mt-1.5 font-display text-base font-semibold text-[#4a2e1a] dark:text-[#f5ebd6]">
                 Espaces Sup &amp; Spé
               </h2>
-              <p className="mt-1 text-xs text-[#4a2e1a]/80">
+              <p className="mt-1 text-xs text-[#4a2e1a]/80 dark:text-[#e3d4b7]">
                 Cours, colloscopes, emplois du temps et chat temps réel.
               </p>
             </GlowCard>
-            <GlowCard onClick={() => onNavigate('/espace-prof')} className="p-5">
-              <p className="text-xs font-medium text-[#a8532c]">Informatique</p>
-              <h2 className="mt-1.5 font-display text-base font-semibold text-[#4a2e1a]">
-                Dépôts de TP Python
+            <GlowCard onClick={() => onNavigate('/ressources')} className="p-5">
+              <p className="text-xs font-medium text-[#a8532c] dark:text-[#e88c5d]">Ressources</p>
+              <h2 className="mt-1.5 font-display text-base font-semibold text-[#4a2e1a] dark:text-[#f5ebd6]">
+                Bibliothèque PDF
               </h2>
-              <p className="mt-1 text-xs text-[#4a2e1a]/80">
-                Consulter les énoncés et remettre vos fichiers Python.
+              <p className="mt-1 text-xs text-[#4a2e1a]/80 dark:text-[#e3d4b7]">
+                Consulter et télécharger les cours, TD, DS et corrigés officiels.
+              </p>
+            </GlowCard>
+            <GlowCard onClick={() => onNavigate('/administration')} className="p-5">
+              <p className="text-xs font-medium text-[#a8532c] dark:text-[#e88c5d]">Administration</p>
+              <h2 className="mt-1.5 font-display text-base font-semibold text-[#4a2e1a] dark:text-[#f5ebd6]">
+                Annonces officielles
+              </h2>
+              <p className="mt-1 text-xs text-[#4a2e1a]/80 dark:text-[#e3d4b7]">
+                Consulter ou publier les notes officielles de la direction.
               </p>
             </GlowCard>
             <GlowCard onClick={() => onNavigate('/internat')} className="p-5">
-              <p className="text-xs font-medium text-[#a8532c]">Campus</p>
-              <h2 className="mt-1.5 font-display text-base font-semibold text-[#4a2e1a]">
+              <p className="text-xs font-medium text-[#a8532c] dark:text-[#e88c5d]">Campus</p>
+              <h2 className="mt-1.5 font-display text-base font-semibold text-[#4a2e1a] dark:text-[#f5ebd6]">
                 Internat &amp; Vie Étudiante
               </h2>
-              <p className="mt-1 text-xs text-[#4a2e1a]/80">
+              <p className="mt-1 text-xs text-[#4a2e1a]/80 dark:text-[#e3d4b7]">
                 Horaires, permanences, BDE et page Instagram du Groupe Média.
               </p>
             </GlowCard>
@@ -155,60 +172,60 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
   }
 
   return (
-    <div className="bg-[#f7ead0] py-12 text-[#4a2e1a]">
-      <div className="mx-auto max-w-5xl px-5 sm:px-6">
-        <div className="border-b-2 border-[#e6c58c] pb-6">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#a8532c]">
+    <div className="bg-[#f7ead0] py-6 text-[#4a2e1a] dark:bg-[#12100e] dark:text-[#f5ebd6] sm:py-12">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6">
+        <div className="border-b-2 border-[#e6c58c] pb-5 dark:border-[#332920] sm:pb-6">
+          <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-[#a8532c] dark:text-[#e88c5d]">
             Portail d’accès sécurisé
           </p>
-          <h1 className="dune-heading mt-2 font-display text-3xl font-semibold text-[#a8532c]">
+          <h1 className="dune-heading mt-1.5 sm:mt-2 font-display text-2xl sm:text-3xl font-semibold text-[#a8532c] dark:text-[#e88c5d]">
             Connexion à Site Prépa
           </h1>
-          <p className="mt-2 max-w-2xl text-sm text-[#4a2e1a]/85">
+          <p className="mt-2 max-w-2xl text-xs sm:text-sm text-[#4a2e1a]/85 dark:text-[#e3d4b7]">
             L’inscription libre est désactivée. Connectez-vous avec les identifiants créés pour vous
             par l’Équipe Dev.
           </p>
         </div>
 
-        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-5">
+        <div className="mt-6 sm:mt-8 grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-5">
           {/* Login Card Only (No Self-Registration) */}
-          <GlowCard className="p-6 lg:col-span-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-[#a8532c]">
+          <GlowCard className="p-4 sm:p-6 lg:col-span-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-[#a8532c] dark:text-[#e88c5d]">
               <KeyRound className="h-4 w-4" />
               <span>Identifiants personnels</span>
             </div>
 
-            <form onSubmit={handleLoginSubmit} className="mt-5 space-y-4">
+            <form onSubmit={handleLoginSubmit} className="mt-4 sm:mt-5 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-[#4a2e1a]">Adresse email</label>
+                <label className="block text-xs font-medium text-[#4a2e1a] dark:text-[#e3d4b7]">Adresse email</label>
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nom@campus.ma"
-                  className="mt-1.5 w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-sm text-[#4a2e1a] placeholder:text-[#4a2e1a]/45"
+                  className="mt-1.5 min-h-[44px] w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-sm text-[#4a2e1a] placeholder:text-[#4a2e1a]/45 dark:border-[#5a4634] dark:bg-[#26211c] dark:text-[#f5ebd6] dark:placeholder:text-[#b5a383] sm:min-h-0"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[#4a2e1a]">Mot de passe</label>
+                <label className="block text-xs font-medium text-[#4a2e1a] dark:text-[#e3d4b7]">Mot de passe</label>
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Votre mot de passe"
-                  className="mt-1.5 w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-sm text-[#4a2e1a] placeholder:text-[#4a2e1a]/45"
+                  className="mt-1.5 min-h-[44px] w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-sm text-[#4a2e1a] placeholder:text-[#4a2e1a]/45 dark:border-[#5a4634] dark:bg-[#26211c] dark:text-[#f5ebd6] dark:placeholder:text-[#b5a383] sm:min-h-0"
                 />
               </div>
 
-              {error ? <p className="text-xs font-medium text-[#a8532c]">{error}</p> : null}
+              {error ? <p className="text-xs font-medium text-[#a8532c] dark:text-[#e88c5d]">{error}</p> : null}
 
               <button
                 type="submit"
                 disabled={submitting}
-                className="btn-rust w-full rounded-lg px-4 py-2.5 text-sm font-semibold cursor-pointer disabled:opacity-50"
+                className="btn-rust min-h-[44px] w-full rounded-lg px-4 py-2.5 text-sm font-semibold cursor-pointer disabled:opacity-50"
               >
                 {submitting ? 'Vérification...' : 'Se connecter'}
               </button>
@@ -219,14 +236,14 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
           <div className="space-y-4 lg:col-span-2">
             {!loadingStatus && !authStatus.hasAdminUser && !authStatus.hasEnvPasscode ? (
               <GlowCard className="p-6">
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#a8532c]">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[#a8532c] dark:text-[#e88c5d]">
                   <Shield className="h-4 w-4" />
                   <span>Premier démarrage · Équipe Dev</span>
                 </div>
-                <h2 className="mt-2 font-display text-lg font-semibold text-[#4a2e1a]">
+                <h2 className="mt-2 font-display text-lg font-semibold text-[#4a2e1a] dark:text-[#f5ebd6]">
                   Activer le compte Équipe Dev
                 </h2>
-                <p className="mt-1.5 text-xs leading-relaxed text-[#4a2e1a]/80">
+                <p className="mt-1.5 text-xs leading-relaxed text-[#4a2e1a]/80 dark:text-[#e3d4b7]">
                   Aucun compte Équipe Dev n’est encore configuré. Créez le premier compte pour
                   accéder au Panneau Équipe Dev et créer les comptes du campus.
                 </p>
@@ -238,7 +255,7 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
                     value={adminName}
                     onChange={(e) => setAdminName(e.target.value)}
                     placeholder="Nom du responsable Dev"
-                    className="w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-xs text-[#4a2e1a]"
+                    className="w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-xs text-[#4a2e1a] placeholder:text-[#4a2e1a]/45 dark:border-[#5a4634] dark:bg-[#26211c] dark:text-[#f5ebd6] dark:placeholder:text-[#b5a383]"
                   />
                   <input
                     type="email"
@@ -246,7 +263,7 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
                     placeholder="Email Équipe Dev"
-                    className="w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-xs text-[#4a2e1a]"
+                    className="w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-xs text-[#4a2e1a] placeholder:text-[#4a2e1a]/45 dark:border-[#5a4634] dark:bg-[#26211c] dark:text-[#f5ebd6] dark:placeholder:text-[#b5a383]"
                   />
                   <input
                     type="password"
@@ -255,7 +272,7 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
                     placeholder="Mot de passe (8+ caractères)"
-                    className="w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-xs text-[#4a2e1a]"
+                    className="w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-xs text-[#4a2e1a] placeholder:text-[#4a2e1a]/45 dark:border-[#5a4634] dark:bg-[#26211c] dark:text-[#f5ebd6] dark:placeholder:text-[#b5a383]"
                   />
                   <button
                     type="submit"
@@ -270,11 +287,11 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
 
             {!loadingStatus && authStatus.hasEnvPasscode ? (
               <GlowCard className="p-6">
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#a8532c]">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[#a8532c] dark:text-[#e88c5d]">
                   <UserCheck className="h-4 w-4" />
                   <span>Accès Équipe Dev</span>
                 </div>
-                <h2 className="mt-2 font-display text-base font-semibold text-[#4a2e1a]">
+                <h2 className="mt-2 font-display text-base font-semibold text-[#4a2e1a] dark:text-[#f5ebd6]">
                   Connexion par code serveur
                 </h2>
                 <form onSubmit={handlePasscodeLogin} className="mt-4 space-y-3">
@@ -284,7 +301,7 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
                     value={adminPasscode}
                     onChange={(e) => setAdminPasscode(e.target.value)}
                     placeholder="Code administrateur serveur"
-                    className="w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-xs text-[#4a2e1a]"
+                    className="w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-xs text-[#4a2e1a] placeholder:text-[#4a2e1a]/45 dark:border-[#5a4634] dark:bg-[#26211c] dark:text-[#f5ebd6] dark:placeholder:text-[#b5a383]"
                   />
                   <button
                     type="submit"
@@ -298,11 +315,11 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
             ) : null}
 
             <GlowCard className="p-6">
-              <div className="flex items-center gap-2 text-xs font-semibold text-[#a8532c]">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#a8532c] dark:text-[#e88c5d]">
                 <Lock className="h-4 w-4" />
                 <span>Création des comptes</span>
               </div>
-              <p className="mt-2 text-xs leading-relaxed text-[#4a2e1a]/85">
+              <p className="mt-2 text-xs leading-relaxed text-[#4a2e1a]/85 dark:text-[#e3d4b7]">
                 Seule l’<strong>Équipe Dev</strong> dispose des autorisations nécessaires pour créer
                 des comptes élèves, délégués, professeurs, maîtres d’internat, BDE (président des
                 étudiants) et Groupe Média (page Instagram) depuis le Panneau Équipe Dev.

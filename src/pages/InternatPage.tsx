@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { GlowCard } from '../components/GlowCard';
 import { useAuth } from '../context/AuthContext';
 import { useLang } from '../context/LangContext';
+import { useToast } from '../context/ToastContext';
 
 interface InternatNotice {
   id: number;
@@ -28,6 +29,7 @@ const DAILY_SCHEDULE = [
 export function InternatPage() {
   const { user, apiFetch } = useAuth();
   const { t } = useLang();
+  const toast = useToast();
   const [notices, setNotices] = useState<InternatNotice[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -67,14 +69,18 @@ export function InternatPage() {
     setLoading(true);
     try {
       const res = await fetch('/api/internat');
-      if (res.ok) {
-        const data = await res.json();
-        setNotices(data.notices || []);
+      if (!res.ok) {
+        toast.error(t('Échec du chargement des avis d’internat.', 'تعذر تحميل إعلانات الداخلية.'));
+        return;
       }
+      const data = await res.json();
+      setNotices(data.notices || []);
+    } catch {
+      toast.error(t('Erreur réseau lors du chargement de l’internat.', 'خطأ في الشبكة أثناء تحميل الداخلية.'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t, toast]);
 
   useEffect(() => {
     void fetchNotices();
@@ -107,42 +113,61 @@ export function InternatPage() {
   const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const res = await apiFetch('/api/internat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pavillon, category, title, content, isPinned }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || 'Publication impossible.');
-      return;
+    try {
+      const res = await apiFetch('/api/internat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pavillon, category, title, content, isPinned }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const msg = data.error || t('Publication impossible.', 'تعذر النشر.');
+        setError(msg);
+        toast.error(msg);
+        return;
+      }
+      setTitle('');
+      setContent('');
+      setIsPinned(false);
+      setShowForm(false);
+      toast.success(
+        t('Publication enregistrée sur le portail Internat.', 'تم النشر في بوابة الداخلية بنجاح.')
+      );
+      await fetchNotices();
+    } catch {
+      const msg = t('Erreur réseau lors de la publication.', 'خطأ في الشبكة أثناء النشر.');
+      setError(msg);
+      toast.error(msg);
     }
-    setTitle('');
-    setContent('');
-    setIsPinned(false);
-    setShowForm(false);
-    await fetchNotices();
   };
 
   const handleDelete = async (id: number) => {
-    const res = await apiFetch(`/api/internat/${id}`, { method: 'DELETE' });
-    if (res.ok) {
+    try {
+      const res = await apiFetch(`/api/internat/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || t('Suppression impossible.', 'تعذر الحذف.'));
+        return;
+      }
       setNotices((prev) => prev.filter((n) => n.id !== id));
+      toast.success(t('Note d’internat supprimée.', 'تم حذف المذكرة بنجاح.'));
+    } catch {
+      toast.error(t('Erreur réseau lors de la suppression.', 'خطأ في الشبكة أثناء الحذف.'));
     }
   };
 
   return (
-    <div className="bg-[#f7ead0] py-8 text-[#4a2e1a] sm:py-12">
+    <div className="bg-[#f7ead0] py-6 text-[#4a2e1a] dark:bg-[#12100e] dark:text-[#f5ebd6] sm:py-12">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="flex flex-col justify-between gap-4 border-b-2 border-[#e6c58c] pb-6 sm:flex-row sm:items-end sm:gap-6 sm:pb-8">
+        <div className="flex flex-col justify-between gap-4 border-b-2 border-[#e6c58c] pb-5 dark:border-[#332920] sm:flex-row sm:items-end sm:gap-6 sm:pb-8">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#a8532c]">
+            <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-[#a8532c] dark:text-[#e88c5d]">
               {t('Vie Résidentielle · Maîtres d’internat', 'الحياة الداخلية · حراس الداخلية')}
             </p>
-            <h1 className="dune-heading mt-2 font-display text-2xl font-semibold tracking-tight text-[#a8532c] sm:text-4xl">
+            <h1 className="dune-heading mt-1.5 sm:mt-2 font-display text-2xl font-semibold tracking-tight text-[#a8532c] dark:text-[#e88c5d] sm:text-4xl">
               {t('Portail de l’Internat', 'بوابة الداخلية')}
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-[#4a2e1a]/85">
+            <p className="mt-2 max-w-2xl text-xs sm:text-sm text-[#4a2e1a]/85 dark:text-[#e3d4b7]">
               {t(
                 'Annonces officielles de l’internat, horaires des repas et études du soir, permanences et notes de service publiées par les maîtres d’internat.',
                 'إعلانات الداخلية الرسمية، مواقيت الوجبات والمذاكرة المسائية، والمناوبات الصادرة عن حراس الداخلية.'
@@ -150,11 +175,11 @@ export function InternatPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:flex sm:flex-wrap sm:items-center shrink-0">
             <a
               href="/documents/guides/reglement-interieur-internat.pdf"
               download
-              className="btn-sand rounded-lg px-3.5 py-2.5 text-xs font-semibold"
+              className="btn-sand inline-flex min-h-[42px] items-center justify-center rounded-lg px-3.5 py-2.5 text-xs font-semibold sm:min-h-0"
             >
               {t('Règlement PDF', 'النظام الداخلي PDF')}
             </a>
@@ -165,7 +190,7 @@ export function InternatPage() {
                   setCategory('Annonce');
                   setShowForm((prev) => !prev);
                 }}
-                className="btn-rust inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold whitespace-nowrap cursor-pointer"
+                className="btn-rust inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold whitespace-nowrap cursor-pointer sm:min-h-0"
               >
                 <Plus className="h-4 w-4" />
                 {showForm ? t('Fermer', 'إغلاق') : t('Publier une annonce / note', 'نشر إعلان أو مذكرة')}
@@ -175,8 +200,8 @@ export function InternatPage() {
         </div>
 
         {/* Interactive Filter Bar & Live Search */}
-        <div className="mt-6 flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
-          <div className="no-scrollbar flex w-full items-center gap-1 overflow-x-auto rounded-lg border border-[#c98f4f]/50 bg-[#e6c58c]/55 p-1 sm:w-fit sm:flex-wrap">
+        <div className="mt-5 sm:mt-6 flex flex-col justify-between gap-2.5 lg:flex-row lg:items-center">
+          <div className="no-scrollbar flex w-full items-center gap-1 overflow-x-auto rounded-lg border border-[#c98f4f]/50 bg-[#e6c58c]/55 p-1 dark:border-[#5a4634] dark:bg-[#27221c] sm:w-fit sm:flex-wrap">
             {(
               [
                 { id: 'ALL', label: t('Tout voir', 'الكل') },
@@ -192,8 +217,10 @@ export function InternatPage() {
                   key={item.id}
                   type="button"
                   onClick={() => setFilterCategory(item.id)}
-                  className={`rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                    active ? 'bg-[#a8532c] text-[#f7ead0]' : 'text-[#4a2e1a] hover:bg-[#c98f4f]/25'
+                  className={`min-h-[36px] shrink-0 rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors cursor-pointer sm:min-h-0 ${
+                    active
+                      ? 'bg-[#a8532c] text-[#f7ead0] dark:bg-[#c25e32] dark:text-[#fdf6e9]'
+                      : 'text-[#4a2e1a] hover:bg-[#c98f4f]/25 dark:text-[#e3d4b7] dark:hover:bg-[#332b23]'
                   }`}
                 >
                   {item.label}
@@ -203,13 +230,13 @@ export function InternatPage() {
           </div>
 
           <div className="relative w-full lg:w-72">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#4a2e1a]/60" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#4a2e1a]/60 dark:text-[#c8b696]" />
             <input
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('Filtrer par pavillon, titre...', 'تصفية حسب الجناح أو العنوان...')}
-              className="w-full rounded-lg border border-[#c98f4f] bg-[#fcf4e4] py-2 pl-9 pr-3 text-xs text-[#4a2e1a] placeholder:text-[#4a2e1a]/45"
+              className="min-h-[42px] w-full rounded-lg border border-[#c98f4f] bg-[#fcf4e4] py-2 pl-9 pr-3 text-xs text-[#4a2e1a] placeholder:text-[#4a2e1a]/45 dark:border-[#5a4634] dark:bg-[#1c1916] dark:text-[#f5ebd6] dark:placeholder:text-[#b5a383] sm:min-h-0"
             />
           </div>
         </div>
@@ -222,30 +249,30 @@ export function InternatPage() {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.16 }}
               onSubmit={handlePublish}
-              className="mt-6 rounded-xl border border-[#c98f4f] bg-[#fcf4e4] p-6"
+              className="mt-6 rounded-xl border border-[#c98f4f] bg-[#fcf4e4] p-4 dark:border-[#5a4634] dark:bg-[#1c1916] sm:p-6"
             >
-              <h2 className="font-display text-base font-semibold text-[#a8532c]">
+              <h2 className="font-display text-base font-semibold text-[#a8532c] dark:text-[#e88c5d]">
                 {category === 'Annonce'
                   ? t('Nouvelle annonce d’internat', 'إعلان جديد للداخلية')
                   : t('Nouvelle note de service', 'مذكرة جديدة')}
               </h2>
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-medium text-[#4a2e1a]">Pavillon / Zone</label>
+                  <label className="block text-xs font-medium text-[#4a2e1a] dark:text-[#e3d4b7]">Pavillon / Zone</label>
                   <input
                     type="text"
                     required
                     value={pavillon}
                     onChange={(e) => setPavillon(e.target.value)}
-                    className="mt-1.5 w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-sm text-[#4a2e1a]"
+                    className="mt-1.5 w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-sm text-[#4a2e1a] dark:border-[#5a4634] dark:bg-[#26211c] dark:text-[#f5ebd6]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[#4a2e1a]">Catégorie</label>
+                  <label className="block text-xs font-medium text-[#4a2e1a] dark:text-[#e3d4b7]">Catégorie</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value as InternatNotice['category'])}
-                    className="mt-1.5 w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-sm text-[#4a2e1a]"
+                    className="mt-1.5 w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-sm text-[#4a2e1a] dark:border-[#5a4634] dark:bg-[#26211c] dark:text-[#f5ebd6]"
                   >
                     <option value="Annonce">Annonce</option>
                     <option value="Horaire">Horaire</option>
@@ -255,36 +282,36 @@ export function InternatPage() {
                 </div>
               </div>
               <div className="mt-4">
-                <label className="block text-xs font-medium text-[#4a2e1a]">Titre</label>
+                <label className="block text-xs font-medium text-[#4a2e1a] dark:text-[#e3d4b7]">Titre</label>
                 <input
                   type="text"
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Ex: Réunion des internes ou permanence exceptionnelle"
-                  className="mt-1.5 w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-sm text-[#4a2e1a] placeholder:text-[#4a2e1a]/45"
+                  className="mt-1.5 w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-sm text-[#4a2e1a] placeholder:text-[#4a2e1a]/45 dark:border-[#5a4634] dark:bg-[#26211c] dark:text-[#f5ebd6] dark:placeholder:text-[#b5a383]"
                 />
               </div>
               <div className="mt-4">
-                <label className="block text-xs font-medium text-[#4a2e1a]">Message</label>
+                <label className="block text-xs font-medium text-[#4a2e1a] dark:text-[#e3d4b7]">Message</label>
                 <textarea
                   rows={3}
                   required
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  className="mt-1.5 w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-sm text-[#4a2e1a]"
+                  className="mt-1.5 w-full rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3 py-2 text-sm text-[#4a2e1a] dark:border-[#5a4634] dark:bg-[#26211c] dark:text-[#f5ebd6]"
                 />
               </div>
-              <label className="mt-3 inline-flex items-center gap-2 text-xs text-[#4a2e1a]">
+              <label className="mt-3 inline-flex items-center gap-2 text-xs text-[#4a2e1a] dark:text-[#e3d4b7]">
                 <input
                   type="checkbox"
                   checked={isPinned}
                   onChange={(e) => setIsPinned(e.target.checked)}
-                  className="rounded border-[#c98f4f]"
+                  className="rounded border-[#c98f4f] dark:border-[#5a4634]"
                 />
                 Épingler en haut des annonces d’internat
               </label>
-              {error ? <p className="mt-2 text-xs font-semibold text-[#a8532c]">{error}</p> : null}
+              {error ? <p className="mt-2 text-xs font-semibold text-[#a8532c] dark:text-[#e88c5d]">{error}</p> : null}
               <div className="mt-4 flex justify-end">
                 <button
                   type="submit"
@@ -302,8 +329,8 @@ export function InternatPage() {
           <section className="mt-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <Megaphone className="h-5 w-5 text-[#a8532c]" />
-                <h2 className="font-display text-xl font-semibold text-[#a8532c]">
+                <Megaphone className="h-5 w-5 text-[#a8532c] dark:text-[#e88c5d]" />
+                <h2 className="font-display text-xl font-semibold text-[#a8532c] dark:text-[#e88c5d]">
                   {t('Annonces de l’Internat', 'إعلانات الداخلية')} ({announcements.length})
                 </h2>
               </div>
@@ -323,9 +350,9 @@ export function InternatPage() {
             </div>
 
             {loading ? (
-              <div className="mt-4 h-32 animate-pulse rounded-xl border border-[#c98f4f]/40 bg-[#fcf4e4]" />
+              <div className="mt-4 h-32 animate-pulse rounded-xl border border-[#c98f4f]/40 bg-[#fcf4e4] dark:border-[#423428] dark:bg-[#1c1916]" />
             ) : announcements.length === 0 ? (
-              <div className="mt-4 rounded-xl border border-[#c98f4f]/45 bg-[#fcf4e4] p-6 text-center text-sm text-[#4a2e1a]/80">
+              <div className="mt-4 rounded-xl border border-[#c98f4f]/45 bg-[#fcf4e4] p-6 text-center text-sm text-[#4a2e1a]/80 dark:border-[#5a4634] dark:bg-[#1c1916] dark:text-[#e3d4b7]">
                 {t('Aucune annonce d’internat ne correspond à votre filtre.', 'لا توجد إعلانات مطابقة حالياً.')}
               </div>
             ) : (
@@ -334,30 +361,30 @@ export function InternatPage() {
                   <GlowCard key={ann.id} className="p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-[#4a2e1a]/75">
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-[#4a2e1a]/75 dark:text-[#c8b696]">
                           {ann.is_pinned ? (
-                            <span className="inline-flex items-center gap-1 font-semibold text-[#a8532c]">
+                            <span className="inline-flex items-center gap-1 font-semibold text-[#a8532c] dark:text-[#e88c5d]">
                               <Pin className="h-3 w-3" />
                               Épinglé
                             </span>
                           ) : null}
-                          <span className="font-semibold text-[#a8532c]">Annonce</span>
+                          <span className="font-semibold text-[#a8532c] dark:text-[#e88c5d]">Annonce</span>
                           <span aria-hidden="true">·</span>
                           <span>{ann.pavillon}</span>
                           <span aria-hidden="true">·</span>
                           <span>{ann.author_name}</span>
                         </div>
-                        <h3 className="mt-2 font-display text-base font-semibold text-[#4a2e1a]">
+                        <h3 className="mt-2 font-display text-base font-semibold text-[#4a2e1a] dark:text-[#f5ebd6]">
                           {ann.title}
                         </h3>
-                        <p className="mt-2 text-sm leading-relaxed text-[#4a2e1a]/85">{ann.content}</p>
+                        <p className="mt-2 text-sm leading-relaxed text-[#4a2e1a]/85 dark:text-[#e3d4b7]">{ann.content}</p>
                       </div>
                       {canManage ? (
                         <button
                           type="button"
                           onClick={() => handleDelete(ann.id)}
                           aria-label="Supprimer l’annonce"
-                          className="rounded-lg border border-[#c98f4f] p-2 text-[#a8532c] hover:bg-[#a8532c] hover:text-[#f7ead0] transition-colors cursor-pointer"
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#c98f4f] text-[#a8532c] hover:bg-[#a8532c] hover:text-[#f7ead0] transition-colors cursor-pointer dark:border-[#5a4634] dark:text-[#e88c5d] dark:hover:bg-[#c25e32] dark:hover:text-[#fdf6e9] sm:h-auto sm:w-auto sm:p-2"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -370,17 +397,17 @@ export function InternatPage() {
           </section>
         ) : null}
 
-        <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="mt-8 sm:mt-10 grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-3">
           {/* Structured Boarding Timetable with Live Time Highlight */}
-          <GlowCard className="p-6 lg:col-span-1">
-            <div className="flex items-center gap-2 text-xs font-semibold text-[#a8532c]">
+          <GlowCard className="p-4 sm:p-6 lg:col-span-1">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#a8532c] dark:text-[#e88c5d]">
               <Clock className="h-4 w-4" />
               <span>{t('Rythme journalier type', 'البرنامج اليومي')}</span>
             </div>
-            <h2 className="mt-2 font-display text-lg font-semibold text-[#4a2e1a]">
+            <h2 className="mt-2 font-display text-lg font-semibold text-[#4a2e1a] dark:text-[#f5ebd6]">
               {t('Horaires de l’internat', 'مواقيت الداخلية')}
             </h2>
-            <div className="mt-5 divide-y divide-[#c98f4f]/30">
+            <div className="mt-5 divide-y divide-[#c98f4f]/30 dark:divide-[#423428]">
               {DAILY_SCHEDULE.map((row) => {
                 const isLive = nowMinutes >= row.startMin && nowMinutes <= row.endMin;
                 const isNext = nextUpcomingStart === row.startMin;
@@ -388,25 +415,25 @@ export function InternatPage() {
                   <div
                     key={row.time}
                     className={`py-3 first:pt-0 last:pb-0 transition-colors ${
-                      isLive ? 'rounded-lg bg-[#e6c58c]/45 px-2.5' : ''
+                      isLive ? 'rounded-lg bg-[#e6c58c]/45 px-2.5 dark:bg-[#2a241d]' : ''
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-xs font-semibold text-[#a8532c] tabular-nums">
+                      <span className="font-mono text-xs font-semibold text-[#a8532c] tabular-nums dark:text-[#e88c5d]">
                         {row.time}
                       </span>
                       {isLive ? (
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#a8532c]">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#a8532c] dark:text-[#e88c5d]">
                           {t('En cours', 'حالياً')}
                         </span>
                       ) : isNext ? (
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-[#4a2e1a]/75">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-[#4a2e1a]/75 dark:text-[#c8b696]">
                           {t('À venir', 'لاحقاً')}
                         </span>
                       ) : null}
                     </div>
-                    <div className="mt-1 text-sm font-semibold text-[#4a2e1a]">{row.activity}</div>
-                    <div className="text-xs text-[#4a2e1a]/75">{row.place}</div>
+                    <div className="mt-1 text-sm font-semibold text-[#4a2e1a] dark:text-[#f5ebd6]">{row.activity}</div>
+                    <div className="text-xs text-[#4a2e1a]/75 dark:text-[#c8b696]">{row.place}</div>
                   </div>
                 );
               })}
@@ -415,15 +442,15 @@ export function InternatPage() {
 
           {/* Service & Permanence Notices */}
           <div className="space-y-4 lg:col-span-2">
-            <h2 className="font-display text-lg font-semibold text-[#4a2e1a]">
+            <h2 className="font-display text-lg font-semibold text-[#4a2e1a] dark:text-[#f5ebd6]">
               {t('Horaires, Permanences & Maintenance', 'المواقيت، المناوبات والصيانة')} ({serviceNotices.length})
             </h2>
 
             {loading ? (
-              <div className="h-40 animate-pulse rounded-xl border border-[#c98f4f]/40 bg-[#fcf4e4]" />
+              <div className="h-40 animate-pulse rounded-xl border border-[#c98f4f]/40 bg-[#fcf4e4] dark:border-[#423428] dark:bg-[#1c1916]" />
             ) : filterCategory === 'Annonce' ? (
-              <div className="rounded-xl border border-[#c98f4f]/45 bg-[#fcf4e4] p-8 text-center text-sm text-[#4a2e1a]/80">
-                <Home className="mx-auto h-6 w-6 text-[#a8532c]" />
+              <div className="rounded-xl border border-[#c98f4f]/45 bg-[#fcf4e4] p-8 text-center text-sm text-[#4a2e1a]/80 dark:border-[#5a4634] dark:bg-[#1c1916] dark:text-[#e3d4b7]">
+                <Home className="mx-auto h-6 w-6 text-[#a8532c] dark:text-[#e88c5d]" />
                 <p className="mt-2">
                   {t(
                     'Filtre actif sur les Annonces uniquement. Cliquez sur « Tout voir » pour afficher les horaires et permanences.',
@@ -432,8 +459,8 @@ export function InternatPage() {
                 </p>
               </div>
             ) : serviceNotices.length === 0 ? (
-              <div className="rounded-xl border border-[#c98f4f]/45 bg-[#fcf4e4] p-8 text-center text-sm text-[#4a2e1a]/80">
-                <Home className="mx-auto h-6 w-6 text-[#a8532c]" />
+              <div className="rounded-xl border border-[#c98f4f]/45 bg-[#fcf4e4] p-8 text-center text-sm text-[#4a2e1a]/80 dark:border-[#5a4634] dark:bg-[#1c1916] dark:text-[#e3d4b7]">
+                <Home className="mx-auto h-6 w-6 text-[#a8532c] dark:text-[#e88c5d]" />
                 <p className="mt-2">Aucune note de service ne correspond à votre filtre.</p>
               </div>
             ) : (
@@ -441,30 +468,30 @@ export function InternatPage() {
                 <GlowCard key={notice.id} className="p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-[#4a2e1a]/75">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-[#4a2e1a]/75 dark:text-[#c8b696]">
                         {notice.is_pinned ? (
-                          <span className="inline-flex items-center gap-1 font-semibold text-[#a8532c]">
+                          <span className="inline-flex items-center gap-1 font-semibold text-[#a8532c] dark:text-[#e88c5d]">
                             <Pin className="h-3 w-3" />
                             Épinglé
                           </span>
                         ) : null}
-                        <span className="font-medium text-[#4a2e1a]">{notice.category}</span>
+                        <span className="font-medium text-[#4a2e1a] dark:text-[#f5ebd6]">{notice.category}</span>
                         <span aria-hidden="true">·</span>
                         <span>{notice.pavillon}</span>
                         <span aria-hidden="true">·</span>
                         <span>{notice.author_name}</span>
                       </div>
-                      <h3 className="mt-2 font-display text-base font-semibold text-[#4a2e1a]">
+                      <h3 className="mt-2 font-display text-base font-semibold text-[#4a2e1a] dark:text-[#f5ebd6]">
                         {notice.title}
                       </h3>
-                      <p className="mt-2 text-sm leading-relaxed text-[#4a2e1a]/85">{notice.content}</p>
+                      <p className="mt-2 text-sm leading-relaxed text-[#4a2e1a]/85 dark:text-[#e3d4b7]">{notice.content}</p>
                     </div>
                     {canManage ? (
                       <button
                         type="button"
                         onClick={() => handleDelete(notice.id)}
                         aria-label="Supprimer la note"
-                        className="rounded-lg border border-[#c98f4f] p-2 text-[#a8532c] hover:bg-[#a8532c] hover:text-[#f7ead0] transition-colors cursor-pointer"
+                        className="rounded-lg border border-[#c98f4f] p-2 text-[#a8532c] hover:bg-[#a8532c] hover:text-[#f7ead0] transition-colors cursor-pointer dark:border-[#5a4634] dark:text-[#e88c5d] dark:hover:bg-[#c25e32] dark:hover:text-[#fdf6e9]"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

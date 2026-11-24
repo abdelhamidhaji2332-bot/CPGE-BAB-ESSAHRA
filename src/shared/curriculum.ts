@@ -19,10 +19,12 @@ export type UserRole =
   | 'groupe_media'
   | 'admin';
 
+export const RESOURCE_CATEGORIES = ['td', 'ds', 'resume', 'cnc', 'cf'] as const;
+export type ResourceCategory = (typeof RESOURCE_CATEGORIES)[number];
+
 export type DocumentCategory =
+  | ResourceCategory
   | 'cours'
-  | 'td'
-  | 'ds'
   | 'concours-blancs'
   | 'corriges'
   | 'colloscopes'
@@ -55,10 +57,21 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Équipe Dev (Admin)',
 };
 
-export const DOCUMENT_CATEGORY_LABELS: Record<DocumentCategory, string> = {
-  cours: 'Cours',
+export const RESOURCE_CATEGORY_LABELS: Record<ResourceCategory, string> = {
   td: 'TD',
-  ds: 'Devoirs Surveillés (DS)',
+  ds: 'DS',
+  resume: 'Résumé',
+  cnc: 'CNC (Spé)',
+  cf: 'CF (Spé)',
+};
+
+export const DOCUMENT_CATEGORY_LABELS: Record<DocumentCategory, string> = {
+  td: 'TD',
+  ds: 'DS',
+  resume: 'Résumé',
+  cnc: 'CNC (Spé)',
+  cf: 'CF (Spé)',
+  cours: 'Cours',
   'concours-blancs': 'Concours Blancs',
   corriges: 'Corrigés',
   colloscopes: 'Colloscopes',

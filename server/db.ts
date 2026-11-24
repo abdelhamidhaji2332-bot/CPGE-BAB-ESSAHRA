@@ -55,7 +55,7 @@ function initSchema(db: Database.Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       class_code TEXT REFERENCES classes(code) ON DELETE CASCADE,
       subject_slug TEXT,
-      category TEXT NOT NULL CHECK (category IN ('cours', 'td', 'ds', 'concours-blancs', 'corriges', 'colloscopes', 'guides')),
+      category TEXT NOT NULL CHECK (category IN ('td', 'ds', 'resume', 'cnc', 'cf', 'cours', 'concours-blancs', 'corriges', 'colloscopes', 'guides')),
       title TEXT NOT NULL,
       chapter TEXT NOT NULL DEFAULT '',
       description TEXT NOT NULL DEFAULT '',
@@ -204,6 +204,19 @@ function initSchema(db: Database.Database): void {
       PRIMARY KEY (user_id, class_code)
     );
 
+    CREATE TABLE IF NOT EXISTS admin_announcements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT NOT NULL CHECK (category IN ('Note officielle', 'Concours & Examens', 'Scolarité', 'Bourses & Internat', 'Urgent')),
+      target_audience TEXT NOT NULL DEFAULT 'Toutes les classes',
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      is_pinned INTEGER NOT NULL DEFAULT 0,
+      author_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      author_name TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_documents_class_cat ON documents(class_code, category);
     CREATE INDEX IF NOT EXISTS idx_timetables_class ON class_timetables(class_code, semester);
     CREATE INDEX IF NOT EXISTS idx_colloscopes_class_week ON class_colloscopes(class_code, week_number);
@@ -211,12 +224,43 @@ function initSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_messages_class ON class_messages(class_code, created_at);
     CREATE INDEX IF NOT EXISTS idx_assignments_class ON info_assignments(class_code);
     CREATE INDEX IF NOT EXISTS idx_class_activity_class ON class_activity_log(class_code, id);
+    CREATE INDEX IF NOT EXISTS idx_admin_announcements ON admin_announcements(is_pinned, created_at);
   `);
 
   try {
     db.exec(`ALTER TABLE campus_events ADD COLUMN instagram_url TEXT NOT NULL DEFAULT ''`);
   } catch {
     // Column already exists
+  }
+
+  const docsTableSql = db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'documents'`)
+    .get() as { sql: string } | undefined;
+  if (docsTableSql && !docsTableSql.sql.includes("'resume'")) {
+    db.pragma('foreign_keys = OFF');
+    db.exec(`
+      BEGIN TRANSACTION;
+      CREATE TABLE documents_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        class_code TEXT REFERENCES classes(code) ON DELETE CASCADE,
+        subject_slug TEXT,
+        category TEXT NOT NULL CHECK (category IN ('td', 'ds', 'resume', 'cnc', 'cf', 'cours', 'concours-blancs', 'corriges', 'colloscopes', 'guides')),
+        title TEXT NOT NULL,
+        chapter TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '',
+        file_path TEXT NOT NULL,
+        file_size INTEGER NOT NULL DEFAULT 0,
+        uploaded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO documents_new (id, class_code, subject_slug, category, title, chapter, description, file_path, file_size, uploaded_by, created_at)
+      SELECT id, class_code, subject_slug, category, title, chapter, description, file_path, file_size, uploaded_by, created_at FROM documents;
+      DROP TABLE documents;
+      ALTER TABLE documents_new RENAME TO documents;
+      CREATE INDEX IF NOT EXISTS idx_documents_class_cat ON documents(class_code, category);
+      COMMIT;
+    `);
+    db.pragma('foreign_keys = ON');
   }
 }
 
@@ -502,6 +546,44 @@ export async function seedCampusDatabase(publicDir: string): Promise<void> {
       }
     });
     assignTx();
+  }
+
+  // 8. Seed initial official administration announcements if empty
+  const existingAdminAnn = (
+    db.prepare('SELECT COUNT(*) as count FROM admin_announcements').get() as { count: number }
+  ).count;
+  if (existingAdminAnn === 0) {
+    const insertAdminAnn = db.prepare(`
+      INSERT INTO admin_announcements (category, target_audience, title, content, is_pinned, author_name)
+      VALUES (@category, @target_audience, @title, @content, @is_pinned, @author_name)
+    `);
+    insertAdminAnn.run({
+      category: 'Note officielle',
+      target_audience: 'Toutes les classes',
+      title: 'Note de la Direction — Diffusion des communiqués officiels du Centre CPGE',
+      content:
+        'Cet espace centralise l’ensemble des notes officielles, calendriers d’examens, avis de scolarité et communiqués urgents publiés par l’Administration du Centre CPGE Bab Sahra.',
+      is_pinned: 1,
+      author_name: 'Direction CPGE Bab Sahra',
+    });
+    insertAdminAnn.run({
+      category: 'Concours & Examens',
+      target_audience: '2ème année · Spé',
+      title: 'Dossiers d’inscription aux Concours Nationaux (CNC / CNAEM)',
+      content:
+        'Les étudiants de 2ème année (MP, PSI1, PSI2, 2ECS) sont invités à vérifier l’exactitude de leurs pièces d’état civil et relevés auprès du secrétariat pédagogique avant validation définitive.',
+      is_pinned: 1,
+      author_name: 'Secrétariat des Concours',
+    });
+    insertAdminAnn.run({
+      category: 'Scolarité',
+      target_audience: 'Toutes les classes',
+      title: 'Dépôt des justificatifs d’absence et demandes d’attestations',
+      content:
+        'Tout justificatif d’absence doit être déposé au bureau de la scolarité dans un délai maximal de 48 heures. Les demandes d’attestation de scolarité sont traitées chaque mardi et jeudi matin.',
+      is_pinned: 0,
+      author_name: 'Service Scolarité',
+    });
   }
 }
 

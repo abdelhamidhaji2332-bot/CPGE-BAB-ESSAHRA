@@ -170,6 +170,10 @@ export function canManageProfTools(user: AuthUser): boolean {
   return user.role === 'admin' || user.role === 'professeur';
 }
 
+export function canManageAdministration(user: AuthUser): boolean {
+  return user.role === 'admin';
+}
+
 export function hasAdminConfigured(): { hasAdminUser: boolean; hasEnvPasscode: boolean } {
   const db = getDb();
   const row = db.prepare(`SELECT COUNT(*) as count FROM users WHERE role = 'admin'`).get() as { count: number };

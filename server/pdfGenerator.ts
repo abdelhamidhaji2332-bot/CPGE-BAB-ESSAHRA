@@ -20,13 +20,13 @@ function ensureDir(dirPath: string): void {
 
 export function ensureDocumentDirectories(publicDir: string): void {
   const docRoot = path.join(publicDir, 'documents');
-  const topFolders = ['colloscopes', 'cours', 'td', 'ds', 'concours-blancs', 'corriges', 'guides'];
+  const topFolders = ['colloscopes', 'cours', 'td', 'ds', 'resume', 'cnc', 'cf', 'concours-blancs', 'corriges', 'guides'];
   for (const folder of topFolders) {
     ensureDir(path.join(docRoot, folder));
   }
 
   for (const cls of CAMPUS_CLASSES) {
-    for (const folder of ['colloscopes', 'td', 'ds', 'concours-blancs', 'corriges']) {
+    for (const folder of ['colloscopes', 'td', 'ds', 'resume', 'cnc', 'cf', 'concours-blancs', 'corriges']) {
       ensureDir(path.join(docRoot, folder, cls.code));
     }
     for (const subj of cls.subjects) {

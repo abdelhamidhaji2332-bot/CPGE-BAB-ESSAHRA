@@ -1,5 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ClassCode, UserRole } from '../shared/curriculum';
+import { useLang } from './LangContext';
+import { useToast } from './ToastContext';
 
 export interface CampusUser {
   id: number;
@@ -32,6 +34,8 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const toast = useToast();
+  const { t } = useLang();
   const [user, setUser] = useState<CampusUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>({
@@ -69,18 +73,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [token]
   );
 
-  const login = useCallback(async (email: string, password: string): Promise<CampusUser> => {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Connexion impossible.');
-    setToken(data.token);
-    setUser(data.user);
-    return data.user;
-  }, []);
+  const login = useCallback(
+    async (email: string, password: string): Promise<CampusUser> => {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Connexion impossible.');
+      setToken(data.token);
+      setUser(data.user);
+      toast.success(
+        t(`Bienvenue, ${data.user.fullName}.`, `مرحباً، ${data.user.fullName}.`),
+        t('Connexion réussie', 'تم تسجيل الدخول')
+      );
+      return data.user;
+    },
+    [t, toast]
+  );
 
   const bootstrapAdmin = useCallback(
     async (payload: { fullName: string; email: string; password: string }): Promise<CampusUser> => {
@@ -94,28 +105,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(data.token);
       setUser(data.user);
       await refreshAuthStatus();
+      toast.success(
+        t('Compte Équipe Dev activé avec succès.', 'تم تفعيل حساب فريق التطوير بنجاح.')
+      );
       return data.user;
     },
-    [refreshAuthStatus]
+    [refreshAuthStatus, t, toast]
   );
 
-  const loginWithAdminPasscode = useCallback(async (passcode: string): Promise<CampusUser> => {
-    const res = await fetch('/api/auth/admin-passcode', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ passcode }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Code administrateur refusé.');
-    setToken(data.token);
-    setUser(data.user);
-    return data.user;
-  }, []);
+  const loginWithAdminPasscode = useCallback(
+    async (passcode: string): Promise<CampusUser> => {
+      const res = await fetch('/api/auth/admin-passcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Code administrateur refusé.');
+      setToken(data.token);
+      setUser(data.user);
+      toast.success(t('Accès Équipe Dev accordé.', 'تم منح صلاحية فريق التطوير.'));
+      return data.user;
+    },
+    [t, toast]
+  );
 
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
-  }, []);
+    toast.info(t('Vous avez été déconnecté(e).', 'تم تسجيل الخروج.'));
+  }, [t, toast]);
 
   return (
     <AuthContext.Provider

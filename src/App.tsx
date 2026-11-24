@@ -4,16 +4,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { ClassQuickSwitcher } from './components/ClassQuickSwitcher';
 import { DunesFooter } from './components/DunesFooter';
 import { Navbar } from './components/Navbar';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { SitePrepaEntrance } from './components/SitePrepaEntrance';
 import { AuthProvider } from './context/AuthContext';
 import { LangProvider } from './context/LangContext';
+import { ThemeProvider } from './context/ThemeContext';
+import { ToastProvider } from './context/ToastContext';
+import { AdministrationPage } from './pages/AdministrationPage';
 import { CampusLifePage } from './pages/CampusLifePage';
 import { ClassWorkspacePage, type WorkspaceTab } from './pages/ClassWorkspacePage';
 import { DevTeamPage } from './pages/DevTeamPage';
 import { InternatPage } from './pages/InternatPage';
 import { LandingPage } from './pages/LandingPage';
 import { PortalPage } from './pages/PortalPage';
-import { ProfWorkspacePage } from './pages/ProfWorkspacePage';
 import { ResourcesPage } from './pages/ResourcesPage';
 
 function CampusShell() {
@@ -64,6 +67,7 @@ function CampusShell() {
   const [pathname, searchString] = locationUrl.split('?');
   const searchParams = new URLSearchParams(searchString || '');
   const tabParam = searchParams.get('tab') as WorkspaceTab | null;
+  const classParam = searchParams.get('class');
   const subjectParam = searchParams.get('subject');
 
   let view = (
@@ -78,7 +82,6 @@ function CampusShell() {
       <ClassWorkspacePage
         classSlug="MPSI"
         initialTab={tabParam || undefined}
-        initialSubject={subjectParam || undefined}
         onNavigate={navigate}
         onOpenClassSwitcher={() => setSwitcherOpen(true)}
       />
@@ -89,19 +92,23 @@ function CampusShell() {
       <ClassWorkspacePage
         classSlug={slug}
         initialTab={tabParam || undefined}
-        initialSubject={subjectParam || undefined}
         onNavigate={navigate}
         onOpenClassSwitcher={() => setSwitcherOpen(true)}
       />
     );
   } else if (pathname === '/ressources') {
-    view = <ResourcesPage />;
+    view = (
+      <ResourcesPage
+        initialClass={classParam || undefined}
+        initialSubject={subjectParam || undefined}
+      />
+    );
   } else if (pathname === '/internat') {
     view = <InternatPage />;
   } else if (pathname === '/vie-campus') {
     view = <CampusLifePage onNavigate={navigate} />;
-  } else if (pathname === '/espace-prof') {
-    view = <ProfWorkspacePage onNavigate={navigate} />;
+  } else if (pathname === '/administration') {
+    view = <AdministrationPage />;
   } else if (pathname === '/portail') {
     view = <PortalPage onNavigate={navigate} />;
   } else if (pathname === '/dev-team') {
@@ -109,7 +116,7 @@ function CampusShell() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f7ead0] text-[#4a2e1a]">
+    <div className="flex min-h-screen flex-col bg-[#f7ead0] text-[#4a2e1a] dark:bg-[#12100e] dark:text-[#f5ebd6]">
       <SitePrepaEntrance
         visible={showEntrance}
         onComplete={() => setShowEntrance(false)}
@@ -117,7 +124,7 @@ function CampusShell() {
 
       <motion.div
         style={{ scaleX }}
-        className="fixed top-0 left-0 right-0 z-50 h-0.5 origin-left bg-[#a8532c]"
+        className="fixed top-0 left-0 right-0 z-50 h-0.5 origin-left bg-[#a8532c] dark:bg-[#e88c5d]"
       />
 
       <Navbar
@@ -159,22 +166,27 @@ function CampusShell() {
             transition={{ duration: 0.16 }}
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             aria-label="Retour en haut"
-            className="btn-rust fixed right-4 bottom-4 z-40 rounded-full p-3 shadow-lg cursor-pointer sm:right-5 sm:bottom-5"
+            className="btn-rust fixed end-4 bottom-20 z-30 flex h-11 w-11 items-center justify-center rounded-full shadow-lg cursor-pointer sm:end-5 md:bottom-5"
           >
             <ArrowUp className="h-4 w-4" />
           </motion.button>
         ) : null}
       </AnimatePresence>
+      <OfflineIndicator />
     </div>
   );
 }
 
 export default function App() {
   return (
-    <LangProvider>
-      <AuthProvider>
-        <CampusShell />
-      </AuthProvider>
-    </LangProvider>
+    <ThemeProvider>
+      <LangProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <CampusShell />
+          </AuthProvider>
+        </ToastProvider>
+      </LangProvider>
+    </ThemeProvider>
   );
 }
