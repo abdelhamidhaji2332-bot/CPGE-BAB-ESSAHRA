@@ -1450,8 +1450,25 @@ async function startServer(): Promise<void> {
   const isProd = process.env.NODE_ENV === 'production' && fs.existsSync(path.resolve(process.cwd(), 'dist', 'index.html'));
   if (!isProd) {
     const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: false },
+      server: { middlewareMode: true, hmr: false, ws: false },
       appType: 'spa',
+      plugins: [
+        {
+          name: 'disable-hmr-client-ws',
+          enforce: 'post',
+          transform(code, id) {
+            if (id.includes('vite/dist/client/client.mjs') || id.includes('vite\\dist\\client\\client.mjs')) {
+              return {
+                code: code.replace(
+                  /const transport = normalizeModuleRunnerTransport\(\(\(\) => \{[\s\S]*?\}\)\(\)\);/,
+                  'const transport = normalizeModuleRunnerTransport({ connect() {}, disconnect() {}, send() {} });'
+                ),
+                map: null,
+              };
+            }
+          },
+        },
+      ],
     });
     app.use(vite.middlewares);
   } else {
