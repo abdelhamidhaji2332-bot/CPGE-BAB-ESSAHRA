@@ -107,8 +107,36 @@ export function PdfPreviewModal({
           Si l’aperçu ne s’affiche pas sur votre téléphone, utilisez « Ouvrir » ou « Télécharger PDF ».
         </div>
 
-        <div className="flex-1 bg-[#e6c58c]/20 dark:bg-[#26211c]">
-          <iframe src={doc.file_path} title={doc.title} className="h-full w-full border-0" />
+        <div className="flex-1 overflow-auto bg-[#e6c58c]/20 dark:bg-[#26211c]">
+          {/\.(png|jpe?g|webp|gif)(\?.*)?$/i.test(doc.file_path) ? (
+            <div className="flex h-full items-center justify-center p-4">
+              <img
+                src={doc.file_path}
+                alt={doc.title}
+                className="max-h-full max-w-full rounded-lg object-contain shadow-sm"
+              />
+            </div>
+          ) : /\.(pdf|txt|md)(\?.*)?$/i.test(doc.file_path) ? (
+            <iframe src={doc.file_path} title={doc.title} className="h-full w-full border-0" />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+              <FileText className="h-12 w-12 text-[#a8532c] dark:text-[#e88c5d]" />
+              <p className="mt-3 font-display text-base font-semibold text-[#4a2e1a] dark:text-[#f5ebd6]">
+                Aperçu direct indisponible pour ce format de fichier
+              </p>
+              <p className="mt-1 max-w-md text-xs text-[#4a2e1a]/75 dark:text-[#c8b696]">
+                Utilisez le bouton « Télécharger » ci-dessus pour ouvrir ce document sur votre appareil.
+              </p>
+              <a
+                href={doc.file_path}
+                download
+                className="btn-rust mt-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Télécharger le fichier
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -27,12 +27,19 @@ import {
 } from './server/auth.ts';
 import { getDb, seedCampusDatabase } from './server/db.ts';
 import {
+  RESSOURCES_ROOT,
+  ensureRessourcesDirectories,
+  syncRessourcesFolderToDb,
+} from './server/ressourcesSync.ts';
+import {
   CAMPUS_CLASSES,
   CLASS_CODES,
   DOCUMENT_CATEGORY_LABELS,
+  RESOURCE_CATEGORIES,
   getClassDefinition,
   isValidClassCode,
   type DocumentCategory,
+  type ResourceCategory,
   type UserRole,
 } from './src/shared/curriculum.ts';
 
@@ -95,15 +102,18 @@ interface WsClientMeta {
 
 async function startServer(): Promise<void> {
   fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+  ensureRessourcesDirectories();
 
   const db = getDb();
   await seedCampusDatabase(PUBLIC_DIR);
+  syncRessourcesFolderToDb(db, true);
 
   const app = express();
   app.use(express.json({ limit: '2mb' }));
 
   // Serve generated/uploaded static documents safely
   app.use('/documents', express.static(DOCS_ROOT));
+  app.use('/ressources', express.static(RESSOURCES_ROOT, { dotfiles: 'ignore', index: false }));
 
   const server = http.createServer(app);
   const wss = new WebSocketServer({ noServer: true });
@@ -466,6 +476,7 @@ async function startServer(): Promise<void> {
   });
 
   app.get('/api/documents', optionalAuth, (req: AuthenticatedRequest, res) => {
+    syncRessourcesFolderToDb(db);
     const classCode = typeof req.query.classCode === 'string' ? req.query.classCode.toUpperCase() : '';
     const category = typeof req.query.category === 'string' ? req.query.category : '';
     const scope = typeof req.query.scope === 'string' ? req.query.scope : '';
@@ -572,8 +583,21 @@ async function startServer(): Promise<void> {
     }
 
     const baseName = sanitizeFileSegment(path.basename(file.originalname, '.pdf')) + '-' + Date.now() + '.pdf';
+    const isResourceCategory = (RESOURCE_CATEGORIES as readonly string[]).includes(category);
     let relativeSegments: string[];
-    if (category === 'guides') {
+    let targetBaseDir = DOCS_ROOT;
+    let urlPrefix = '/documents';
+
+    if (isResourceCategory) {
+      targetBaseDir = RESSOURCES_ROOT;
+      urlPrefix = '/ressources';
+      const classDef = getClassDefinition(classCodeRaw);
+      const validSubject =
+        classDef && subjectSlug && classDef.subjects.some((s) => s.slug === subjectSlug)
+          ? subjectSlug
+          : sanitizeFileSegment(subjectSlug || 'general');
+      relativeSegments = [classCodeRaw, validSubject, category, baseName];
+    } else if (category === 'guides') {
       relativeSegments = ['guides', baseName];
     } else if (category === 'cours' && subjectSlug) {
       relativeSegments = ['cours', classCodeRaw, sanitizeFileSegment(subjectSlug), baseName];
@@ -581,7 +605,7 @@ async function startServer(): Promise<void> {
       relativeSegments = [category, classCodeRaw, baseName];
     }
 
-    const resolvedTarget = resolveInside(DOCS_ROOT, ...relativeSegments);
+    const resolvedTarget = resolveInside(targetBaseDir, ...relativeSegments);
     if (!resolvedTarget) {
       res.status(400).json({ error: 'Chemin de stockage invalide.' });
       return;
@@ -590,7 +614,7 @@ async function startServer(): Promise<void> {
     fs.mkdirSync(path.dirname(resolvedTarget), { recursive: true });
     fs.writeFileSync(resolvedTarget, file.buffer);
 
-    const publicUrlPath = `/documents/${relativeSegments.join('/')}`;
+    const publicUrlPath = `${urlPrefix}/${relativeSegments.map((s) => encodeURIComponent(s)).join('/')}`;
     const result = db
       .prepare(
         `INSERT INTO documents (class_code, subject_slug, category, title, chapter, description, file_path, file_size, uploaded_by)
@@ -607,6 +631,10 @@ async function startServer(): Promise<void> {
         file.size,
         req.user!.id
       );
+
+    if (isResourceCategory) {
+      syncRessourcesFolderToDb(db, true);
+    }
 
     const created = db.prepare('SELECT * FROM documents WHERE id = ?').get(Number(result.lastInsertRowid));
     if (!isGuide && isValidClassCode(classCodeRaw)) {
@@ -639,14 +667,26 @@ async function startServer(): Promise<void> {
       return;
     }
     db.prepare('DELETE FROM documents WHERE id = ?').run(id);
-    const rel = existing.file_path.replace(/^\/documents\/+/, '');
-    const resolved = resolveInside(DOCS_ROOT, rel);
+
+    const isRessourceFile = existing.file_path.startsWith('/ressources/');
+    const baseDir = isRessourceFile ? RESSOURCES_ROOT : DOCS_ROOT;
+    const rawRel = existing.file_path.replace(/^\/(?:ressources|documents)\/+/, '');
+    let decodedRel = rawRel;
+    try {
+      decodedRel = decodeURIComponent(rawRel);
+    } catch {
+      decodedRel = rawRel;
+    }
+    const resolved = resolveInside(baseDir, decodedRel);
     if (resolved && fs.existsSync(resolved)) {
       try {
         fs.unlinkSync(resolved);
       } catch {
         // Ignore file unlink errors
       }
+    }
+    if (isRessourceFile) {
+      syncRessourcesFolderToDb(db, true);
     }
     res.json({ ok: true });
   });
@@ -1418,7 +1458,7 @@ async function startServer(): Promise<void> {
     const distDir = path.resolve(process.cwd(), 'dist');
     app.use(express.static(distDir));
     app.get('*', (req, res, next) => {
-      if (req.path.startsWith('/api/') || req.path.startsWith('/documents/')) {
+      if (req.path.startsWith('/api/') || req.path.startsWith('/documents/') || req.path.startsWith('/ressources/')) {
         next();
         return;
       }

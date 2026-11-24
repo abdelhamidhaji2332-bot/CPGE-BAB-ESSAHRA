@@ -311,18 +311,22 @@ export async function seedCampusDatabase(publicDir: string): Promise<void> {
   });
   tx();
 
-  // 2. Remove un-authored starter lessons/TD/DS/corrigés/concours-blancs so teachers upload real content
+  // 2. Remove un-authored starter lessons/TD/DS/corrigés/concours-blancs in /documents so teachers upload real content
   const stalePlaceholders = db
     .prepare(
       `SELECT id, file_path FROM documents
-       WHERE uploaded_by IS NULL AND category IN ('cours', 'td', 'ds', 'concours-blancs', 'corriges')`
+       WHERE uploaded_by IS NULL
+         AND file_path LIKE '/documents/%'
+         AND category IN ('cours', 'td', 'ds', 'concours-blancs', 'corriges')`
     )
     .all() as Array<{ id: number; file_path: string }>;
 
   if (stalePlaceholders.length > 0) {
     db.prepare(
       `DELETE FROM documents
-       WHERE uploaded_by IS NULL AND category IN ('cours', 'td', 'ds', 'concours-blancs', 'corriges')`
+       WHERE uploaded_by IS NULL
+         AND file_path LIKE '/documents/%'
+         AND category IN ('cours', 'td', 'ds', 'concours-blancs', 'corriges')`
     ).run();
     for (const row of stalePlaceholders) {
       const rel = row.file_path.replace(/^\/+/, '');

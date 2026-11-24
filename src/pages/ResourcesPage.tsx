@@ -563,7 +563,7 @@ export function ResourcesPage({
                           className="btn-rust inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-semibold sm:min-h-0"
                         >
                           <Download className="h-3.5 w-3.5" />
-                          PDF
+                          {(doc.file_path.split('.').pop()?.split('?')[0] || 'PDF').toUpperCase()}
                         </a>
                         {canUpload ? (
                           <button
