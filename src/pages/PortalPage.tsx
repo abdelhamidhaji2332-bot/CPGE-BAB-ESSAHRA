@@ -10,6 +10,7 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
     user,
     authStatus,
     loadingStatus,
+    signInWithGoogle,
     login,
     bootstrapAdmin,
     loginWithAdminPasscode,
@@ -27,6 +28,20 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [adminPasscode, setAdminPasscode] = useState('');
+
+  const handleGoogleSignIn = async () => {
+    setError(null);
+    setSubmitting(true);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur de connexion Google.';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,14 +203,38 @@ export function PortalPage({ onNavigate }: { onNavigate: (path: string) => void 
         </div>
 
         <div className="mt-6 sm:mt-8 grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-5">
-          {/* Login Card Only (No Self-Registration) */}
+          {/* Login Card */}
           <GlowCard className="p-4 sm:p-6 lg:col-span-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-[#a8532c] dark:text-[#e88c5d]">
               <KeyRound className="h-4 w-4" />
               <span>Identifiants personnels</span>
             </div>
 
-            <form onSubmit={handleLoginSubmit} className="mt-4 sm:mt-5 space-y-4">
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={submitting}
+                className="btn-sand flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-lg px-4 py-2.5 text-sm font-semibold cursor-pointer disabled:opacity-50"
+              >
+                <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    fill="currentColor"
+                    d="M21.35 11.1h-9.17v2.92h5.27c-.23 1.45-1.69 4.25-5.27 4.25-3.17 0-5.76-2.62-5.76-5.85s2.59-5.85 5.76-5.85c1.81 0 3.02.77 3.71 1.44l2.53-2.44C16.81 4.07 14.7 3.2 12.18 3.2 7.21 3.2 3.18 7.23 3.18 12.2s4.03 9 9 9c5.19 0 8.64-3.65 8.64-8.79 0-.59-.06-1.04-.15-1.31z"
+                  />
+                </svg>
+                <span>Se connecter avec Google</span>
+              </button>
+              <div className="my-4 flex items-center gap-3">
+                <span className="h-px flex-1 bg-[#e6c58c] dark:bg-[#332920]" />
+                <span className="text-[11px] uppercase tracking-wider text-[#4a2e1a]/60 dark:text-[#c8b696]">
+                  ou identifiants campus
+                </span>
+                <span className="h-px flex-1 bg-[#e6c58c] dark:bg-[#332920]" />
+              </div>
+            </div>
+
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-[#4a2e1a] dark:text-[#e3d4b7]">Adresse email</label>
                 <input

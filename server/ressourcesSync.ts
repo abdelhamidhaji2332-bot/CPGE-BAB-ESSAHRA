@@ -1,6 +1,8 @@
-import type Database from 'better-sqlite3';
+import { eq, like } from 'drizzle-orm';
 import fs from 'fs';
 import path from 'path';
+import { db } from '../src/db/index.ts';
+import { documents } from '../src/db/schema.ts';
 import {
   CAMPUS_CLASSES,
   RESOURCE_CATEGORIES,
@@ -66,7 +68,9 @@ function buildReadmeContent(): string {
   for (const cls of CAMPUS_CLASSES) {
     lines.push(`### ${cls.code} — ${cls.levelLabel}`);
     for (const subj of cls.subjects) {
-      lines.push(`- \`ressources/${cls.code}/${subj.slug}/\` → ${RESOURCE_CATEGORIES.map((c) => `\`${c}\``).join(', ')} (${subj.name})`);
+      lines.push(
+        `- \`ressources/${cls.code}/${subj.slug}/\` → ${RESOURCE_CATEGORIES.map((c) => `\`${c}\``).join(', ')} (${subj.name})`
+      );
     }
     lines.push('');
   }
@@ -166,10 +170,6 @@ function collectFilesRecursively(
 }
 
 function parseScannedFile(relSegments: string[], size: number): ScannedResourceFile | null {
-  // Expected canonical layout:
-  //   <CLASS_CODE>/<SUBJECT_SLUG>/<CATEGORY>/<...subfolders>/<filename>
-  // Also gracefully supports:
-  //   <CLASS_CODE>/<CATEGORY>/<...subfolders>/<filename>
   if (relSegments.length < 3) return null;
 
   const rawClass = relSegments[0].toUpperCase();
@@ -218,7 +218,7 @@ function parseScannedFile(relSegments: string[], size: number): ScannedResourceF
   };
 }
 
-export function syncRessourcesFolderToDb(db: Database.Database, force = false): void {
+export async function syncRessourcesFolderToDb(force = false): Promise<void> {
   const now = Date.now();
   if (!force && now - lastSyncTimestamp < SYNC_COOLDOWN_MS) {
     return;
@@ -240,44 +240,49 @@ export function syncRessourcesFolderToDb(db: Database.Database, force = false): 
     }
   }
 
-  const existingRows = db
-    .prepare(`SELECT id, file_path, file_size FROM documents WHERE file_path LIKE '/ressources/%'`)
-    .all() as Array<{ id: number; file_path: string; file_size: number }>;
+  try {
+    const existingRows = await db
+      .select({
+        id: documents.id,
+        filePath: documents.filePath,
+        fileSize: documents.fileSize,
+      })
+      .from(documents)
+      .where(like(documents.filePath, '/ressources/%'));
 
-  const existingByPath = new Map(existingRows.map((row) => [row.file_path, row]));
+    const existingByPath = new Map(existingRows.map((row) => [row.filePath, row]));
 
-  const insertStmt = db.prepare(`
-    INSERT INTO documents (class_code, subject_slug, category, title, chapter, description, file_path, file_size, uploaded_by)
-    VALUES (@class_code, @subject_slug, @category, @title, @chapter, @description, @file_path, @file_size, NULL)
-  `);
-  const updateSizeStmt = db.prepare(`UPDATE documents SET file_size = ? WHERE id = ?`);
-  const deleteStmt = db.prepare(`DELETE FROM documents WHERE id = ?`);
-
-  const syncTx = db.transaction(() => {
-    for (const [filePath, item] of scannedMap.entries()) {
-      const existing = existingByPath.get(filePath);
-      if (!existing) {
-        insertStmt.run({
-          class_code: item.classCode,
-          subject_slug: item.subjectSlug,
-          category: item.category,
-          title: item.title,
-          chapter: item.chapter,
-          description: item.description,
-          file_path: item.filePath,
-          file_size: item.fileSize,
-        });
-      } else if (existing.file_size !== item.fileSize) {
-        updateSizeStmt.run(item.fileSize, existing.id);
+    await db.transaction(async (tx) => {
+      for (const [filePath, item] of scannedMap.entries()) {
+        const existing = existingByPath.get(filePath);
+        if (!existing) {
+          await tx.insert(documents).values({
+            classCode: item.classCode,
+            subjectSlug: item.subjectSlug,
+            category: item.category,
+            title: item.title,
+            chapter: item.chapter,
+            description: item.description,
+            filePath: item.filePath,
+            fileSize: item.fileSize,
+            uploadedBy: null,
+          });
+        } else if (existing.fileSize !== item.fileSize) {
+          await tx
+            .update(documents)
+            .set({ fileSize: item.fileSize })
+            .where(eq(documents.id, existing.id));
+        }
       }
-    }
 
-    for (const row of existingRows) {
-      if (!scannedMap.has(row.file_path)) {
-        deleteStmt.run(row.id);
+      for (const row of existingRows) {
+        if (!scannedMap.has(row.filePath)) {
+          await tx.delete(documents).where(eq(documents.id, row.id));
+        }
       }
-    }
-  });
-
-  syncTx();
+    });
+  } catch (error) {
+    console.error('Failed to sync ressources folder to Cloud SQL:', error);
+    throw new Error('Database query failed. Please try again later.', { cause: error });
+  }
 }
