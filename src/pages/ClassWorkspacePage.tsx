@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   Calendar,
   Compass,
@@ -211,60 +211,93 @@ export function ClassWorkspacePage({
     }
   }, [initialTab]);
 
-  const loadOverview = useCallback(async () => {
-    setLoadingOverview(true);
-    try {
-      const res = await apiFetch(`/api/classes/${activeClass.code}/overview`);
-      if (!res.ok) {
-        toast.error(t(`Impossible de charger l’espace ${activeClass.code}.`, `تعذر تحميل فضاء ${activeClass.code}.`));
-        return;
-      }
-      const data = await res.json();
-      setDocuments(data.documents || []);
-      setTimetables(data.timetables || []);
-      setColloscopes(data.colloscopes || []);
-      setCanAccessPrivate(Boolean(data.canAccessPrivate));
-      setIsModerator(Boolean(data.isModerator));
-    } catch {
-      toast.error(t('Erreur réseau lors du chargement de la classe.', 'خطأ في الشبكة أثناء تحميل القسم.'));
-    } finally {
-      setLoadingOverview(false);
-    }
-  }, [activeClass.code, apiFetch, t, toast]);
-
-  const loadPrivateWorkspace = useCallback(async () => {
-    if (!token) {
-      setPrivateError('Connectez-vous sur le Portail pour consulter les annonces officielles et le chat de classe.');
-      setAnnouncements([]);
-      setMessages([]);
-      return;
-    }
-    setLoadingPrivate(true);
-    setPrivateError(null);
-    try {
-      const res = await apiFetch(`/api/classes/${activeClass.code}/workspace-private`);
-      const data = await res.json();
-      if (!res.ok) {
-        setPrivateError(data.error || 'Accès restreint à cette classe.');
+  const loadPrivateWorkspace = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!token) {
+        setPrivateError('Connectez-vous sur le Portail pour consulter les annonces officielles et le chat de classe.');
         setAnnouncements([]);
         setMessages([]);
         return;
       }
-      setAnnouncements(data.announcements || []);
-      setMessages(data.messages || []);
-      setIsModerator(Boolean(data.isModerator));
-    } finally {
-      setLoadingPrivate(false);
-    }
-  }, [activeClass.code, apiFetch, token]);
+      setLoadingPrivate(true);
+      setPrivateError(null);
+      try {
+        const res = await apiFetch(`/api/classes/${activeClass.code}/workspace-private`, { signal });
+        const data = await res.json();
+        if (signal?.aborted) return;
+        if (!res.ok) {
+          setPrivateError(data.error || 'Accès restreint à cette classe.');
+          setAnnouncements([]);
+          setMessages([]);
+          return;
+        }
+        setAnnouncements(data.announcements || []);
+        setMessages(data.messages || []);
+        setIsModerator(Boolean(data.isModerator));
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (!signal?.aborted) {
+          setPrivateError('Impossible de charger l’espace privé de cette classe pour le moment.');
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setLoadingPrivate(false);
+        }
+      }
+    },
+    [activeClass.code, apiFetch, token]
+  );
+
+  const loadOverview = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoadingOverview(true);
+      try {
+        const res = await apiFetch(`/api/classes/${activeClass.code}/overview`, { signal });
+        if (!res.ok) {
+          if (!signal?.aborted) {
+            toast.error(t(`Impossible de charger l’espace ${activeClass.code}.`, `تعذر تحميل فضاء ${activeClass.code}.`));
+          }
+          return;
+        }
+        const data = await res.json();
+        if (signal?.aborted) return;
+        const hasPrivateAccess = Boolean(data.canAccessPrivate);
+        setDocuments(data.documents || []);
+        setTimetables(data.timetables || []);
+        setColloscopes(data.colloscopes || []);
+        setCanAccessPrivate(hasPrivateAccess);
+        setIsModerator(Boolean(data.isModerator));
+
+        if (hasPrivateAccess && token) {
+          await loadPrivateWorkspace(signal);
+        } else {
+          setAnnouncements([]);
+          setMessages([]);
+          setPrivateError(
+            token
+              ? 'Accès restreint à cette classe.'
+              : 'Connectez-vous sur le Portail pour consulter les annonces officielles et le chat de classe.'
+          );
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (!signal?.aborted) {
+          toast.error(t('Erreur réseau lors du chargement de la classe.', 'خطأ في الشبكة أثناء تحميل القسم.'));
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setLoadingOverview(false);
+        }
+      }
+    },
+    [activeClass.code, apiFetch, loadPrivateWorkspace, t, toast, token]
+  );
 
   useEffect(() => {
-    void loadOverview();
+    const controller = new AbortController();
+    void loadOverview(controller.signal);
+    return () => controller.abort();
   }, [loadOverview]);
-
-  useEffect(() => {
-    void loadPrivateWorkspace();
-  }, [loadPrivateWorkspace]);
 
   // WebSocket live connection for class chat & moderator announcements
   useEffect(() => {
@@ -717,14 +750,7 @@ export function ClassWorkspacePage({
           })}
         </div>
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={`${activeClass.code}-${activeTab}`}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-          >
+        <div>
         {/* TAB 1: COLLOSCOPE INTERACTIF */}
         {activeTab === 'colloscope' ? (
             <div className="mt-6 space-y-5">
@@ -1502,8 +1528,7 @@ export function ClassWorkspacePage({
             </div>
           )
         ) : null}
-          </motion.div>
-        </AnimatePresence>
+        </div>
       </div>
 
       <ImageLightboxModal image={lightboxImage} onClose={() => setLightboxImage(null)} />

@@ -63,25 +63,38 @@ export function CampusLifePage({ onNavigate }: { onNavigate: (path: string) => v
   const canPublish =
     user && (user.role === 'bde' || user.role === 'groupe_media' || user.role === 'admin');
 
-  const fetchEvents = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch('/api/events');
-      if (!res.ok) {
-        toast.error(t('Échec du chargement des événements.', 'تعذر تحميل الأنشطة.'));
-        return;
+  const fetchEvents = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      try {
+        const res = await apiFetch('/api/events', { signal });
+        if (!res.ok) {
+          if (!signal?.aborted) {
+            toast.error(t('Échec du chargement des événements.', 'تعذر تحميل الأنشطة.'));
+          }
+          return;
+        }
+        const data = await res.json();
+        if (signal?.aborted) return;
+        setEvents(data.events || []);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (!signal?.aborted) {
+          toast.error(t('Erreur réseau lors du chargement des événements.', 'خطأ في الشبكة أثناء تحميل الأنشطة.'));
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
       }
-      const data = await res.json();
-      setEvents(data.events || []);
-    } catch {
-      toast.error(t('Erreur réseau lors du chargement des événements.', 'خطأ في الشبكة أثناء تحميل الأنشطة.'));
-    } finally {
-      setLoading(false);
-    }
-  }, [apiFetch, t, toast]);
+    },
+    [apiFetch, t, toast]
+  );
 
   useEffect(() => {
-    void fetchEvents();
+    const controller = new AbortController();
+    void fetchEvents(controller.signal);
+    return () => controller.abort();
   }, [fetchEvents]);
 
   const filtered = useMemo(() => {
@@ -465,15 +478,7 @@ export function CampusLifePage({ onNavigate }: { onNavigate: (path: string) => v
             {t('Aucun événement ne correspond à votre recherche.', 'لا توجد أنشطة مطابقة للبحث.')}
           </div>
         ) : (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`${filterGroup}-${searchQuery}`}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.15 }}
-              className="mt-6 sm:mt-8 grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2"
-            >
+          <div className="mt-6 sm:mt-8 grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2">
               {filtered.map((ev) => {
                 const registered = Boolean(ev.is_registered);
                 const isExpanded = Boolean(expandedIds[ev.id]);
@@ -604,8 +609,7 @@ export function CampusLifePage({ onNavigate }: { onNavigate: (path: string) => v
                   </GlowCard>
                 );
               })}
-            </motion.div>
-          </AnimatePresence>
+          </div>
         )}
       </div>
     </div>

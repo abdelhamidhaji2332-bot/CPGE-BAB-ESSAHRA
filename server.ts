@@ -113,7 +113,7 @@ async function startServer(): Promise<void> {
 
   // Serve generated/uploaded static documents safely
   app.use('/documents', express.static(DOCS_ROOT));
-  app.use('/ressources', express.static(RESSOURCES_ROOT, { dotfiles: 'ignore', index: false }));
+  app.use('/ressources', express.static(RESSOURCES_ROOT, { dotfiles: 'ignore', index: false, redirect: false }));
 
   const server = http.createServer(app);
   const wss = new WebSocketServer({ noServer: true });

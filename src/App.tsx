@@ -61,7 +61,7 @@ function CampusShell() {
       window.history.pushState({}, '', nextUrl);
     }
     setLocationUrl(nextUrl);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   }, []);
 
   const [pathname, searchString] = locationUrl.split('?');
@@ -134,19 +134,7 @@ function CampusShell() {
         entranceReady={!showEntrance}
       />
 
-      <main className="flex-1">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={pathname}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-          >
-            {view}
-          </motion.div>
-        </AnimatePresence>
-      </main>
+      <main className="flex-1">{view}</main>
 
       <DunesFooter onNavigate={navigate} />
 

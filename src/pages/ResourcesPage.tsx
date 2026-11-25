@@ -70,30 +70,43 @@ export function ResourcesPage({
 
   const canUpload = user && (user.role === 'admin' || user.role === 'professeur');
 
-  const fetchDocs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.set('scope', 'ressources');
-      if (selectedClass !== 'ALL') params.set('classCode', selectedClass);
-      if (query.trim()) params.set('q', query.trim());
-      const res = await apiFetch(`/api/documents?${params.toString()}`);
-      if (!res.ok) {
-        toast.error(t('Échec du chargement des ressources PDF.', 'تعذر تحميل الموارد الرقمية.'));
-        return;
+  const fetchDocs = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set('scope', 'ressources');
+        if (selectedClass !== 'ALL') params.set('classCode', selectedClass);
+        if (query.trim()) params.set('q', query.trim());
+        const res = await apiFetch(`/api/documents?${params.toString()}`, { signal });
+        if (!res.ok) {
+          if (!signal?.aborted) {
+            toast.error(t('Échec du chargement des ressources PDF.', 'تعذر تحميل الموارد الرقمية.'));
+          }
+          return;
+        }
+        const data = await res.json();
+        if (signal?.aborted) return;
+        const allowed = new Set<string>(RESOURCE_CATEGORIES);
+        setDocs(((data.documents || []) as ResourceRow[]).filter((d) => allowed.has(d.category)));
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (!signal?.aborted) {
+          toast.error(t('Erreur réseau lors du chargement des ressources.', 'خطأ في الشبكة أثناء تحميل الموارد.'));
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
       }
-      const data = await res.json();
-      const allowed = new Set<string>(RESOURCE_CATEGORIES);
-      setDocs(((data.documents || []) as ResourceRow[]).filter((d) => allowed.has(d.category)));
-    } catch {
-      toast.error(t('Erreur réseau lors du chargement des ressources.', 'خطأ في الشبكة أثناء تحميل الموارد.'));
-    } finally {
-      setLoading(false);
-    }
-  }, [apiFetch, selectedClass, query, t, toast]);
+    },
+    [apiFetch, selectedClass, query, t, toast]
+  );
 
   useEffect(() => {
-    void fetchDocs();
+    const controller = new AbortController();
+    void fetchDocs(controller.signal);
+    return () => controller.abort();
   }, [fetchDocs]);
 
   // Available subjects synchronized with selectedClass
@@ -490,15 +503,7 @@ export function ResourcesPage({
             ) : null}
           </div>
         ) : (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`${selectedClass}-${selectedSubject}-${selectedCategory}`}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.15 }}
-              className="mt-6 sm:mt-8 grid grid-cols-1 gap-3.5 sm:gap-4 md:grid-cols-2 lg:grid-cols-3"
-            >
+          <div className="mt-6 sm:mt-8 grid grid-cols-1 gap-3.5 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
               {visibleDocs.map((doc) => (
                 <GlowCard key={doc.id} className="p-4 sm:p-5">
                   <div className="flex h-full flex-col justify-between">
@@ -580,8 +585,7 @@ export function ResourcesPage({
                   </div>
                 </GlowCard>
               ))}
-            </motion.div>
-          </AnimatePresence>
+          </div>
         )}
       </div>
 

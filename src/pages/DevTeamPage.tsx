@@ -39,26 +39,39 @@ export function DevTeamPage({ onNavigate }: { onNavigate: (path: string) => void
 
   const isDevTeam = user?.role === 'admin';
 
-  const loadAccounts = useCallback(async () => {
-    if (!isDevTeam) return;
-    setLoading(true);
-    try {
-      const res = await apiFetch('/api/admin/users');
-      if (!res.ok) {
-        toast.error('Impossible de charger la liste des comptes.');
-        return;
+  const loadAccounts = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!isDevTeam) return;
+      setLoading(true);
+      try {
+        const res = await apiFetch('/api/admin/users', { signal });
+        if (!res.ok) {
+          if (!signal?.aborted) {
+            toast.error('Impossible de charger la liste des comptes.');
+          }
+          return;
+        }
+        const data = await res.json();
+        if (signal?.aborted) return;
+        setAccounts(data.users || []);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (!signal?.aborted) {
+          toast.error('Erreur réseau lors du chargement des comptes.');
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
       }
-      const data = await res.json();
-      setAccounts(data.users || []);
-    } catch {
-      toast.error('Erreur réseau lors du chargement des comptes.');
-    } finally {
-      setLoading(false);
-    }
-  }, [apiFetch, isDevTeam, toast]);
+    },
+    [apiFetch, isDevTeam, toast]
+  );
 
   useEffect(() => {
-    void loadAccounts();
+    const controller = new AbortController();
+    void loadAccounts(controller.signal);
+    return () => controller.abort();
   }, [loadAccounts]);
 
   const handleCreateAccount = async (e: React.FormEvent) => {

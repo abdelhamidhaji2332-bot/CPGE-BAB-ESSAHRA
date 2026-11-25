@@ -65,25 +65,38 @@ export function InternatPage() {
     return upcoming ? upcoming.startMin : null;
   }, [nowMinutes]);
 
-  const fetchNotices = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/internat');
-      if (!res.ok) {
-        toast.error(t('Échec du chargement des avis d’internat.', 'تعذر تحميل إعلانات الداخلية.'));
-        return;
+  const fetchNotices = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/internat', { signal });
+        if (!res.ok) {
+          if (!signal?.aborted) {
+            toast.error(t('Échec du chargement des avis d’internat.', 'تعذر تحميل إعلانات الداخلية.'));
+          }
+          return;
+        }
+        const data = await res.json();
+        if (signal?.aborted) return;
+        setNotices(data.notices || []);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (!signal?.aborted) {
+          toast.error(t('Erreur réseau lors du chargement de l’internat.', 'خطأ في الشبكة أثناء تحميل الداخلية.'));
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
       }
-      const data = await res.json();
-      setNotices(data.notices || []);
-    } catch {
-      toast.error(t('Erreur réseau lors du chargement de l’internat.', 'خطأ في الشبكة أثناء تحميل الداخلية.'));
-    } finally {
-      setLoading(false);
-    }
-  }, [t, toast]);
+    },
+    [t, toast]
+  );
 
   useEffect(() => {
-    void fetchNotices();
+    const controller = new AbortController();
+    void fetchNotices(controller.signal);
+    return () => controller.abort();
   }, [fetchNotices]);
 
   const matchedNotices = useMemo(() => {

@@ -74,35 +74,48 @@ export function AdministrationPage() {
 
   const canManage = user?.role === 'admin';
 
-  const fetchAnnouncements = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/administration/announcements');
-      if (!res.ok) {
-        toast.error(
-          t(
-            'Impossible de charger les annonces de l’administration.',
-            'تعذر تحميل إعلانات الإدارة.'
-          )
-        );
-        return;
+  const fetchAnnouncements = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/administration/announcements', { signal });
+        if (!res.ok) {
+          if (!signal?.aborted) {
+            toast.error(
+              t(
+                'Impossible de charger les annonces de l’administration.',
+                'تعذر تحميل إعلانات الإدارة.'
+              )
+            );
+          }
+          return;
+        }
+        const data = await res.json();
+        if (signal?.aborted) return;
+        setAnnouncements(data.announcements || []);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        if (!signal?.aborted) {
+          toast.error(
+            t(
+              'Erreur réseau lors du chargement des annonces officielles.',
+              'خطأ في الشبكة أثناء تحميل الإعلانات الرسمية.'
+            )
+          );
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
       }
-      const data = await res.json();
-      setAnnouncements(data.announcements || []);
-    } catch {
-      toast.error(
-        t(
-          'Erreur réseau lors du chargement des annonces officielles.',
-          'خطأ في الشبكة أثناء تحميل الإعلانات الرسمية.'
-        )
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [t, toast]);
+    },
+    [t, toast]
+  );
 
   useEffect(() => {
-    void fetchAnnouncements();
+    const controller = new AbortController();
+    void fetchAnnouncements(controller.signal);
+    return () => controller.abort();
   }, [fetchAnnouncements]);
 
   const resetForm = () => {

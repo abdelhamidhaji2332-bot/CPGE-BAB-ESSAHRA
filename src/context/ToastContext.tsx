@@ -29,7 +29,6 @@ export interface ToastItem {
 }
 
 interface ToastContextValue {
-  toasts: ToastItem[];
   notify: (input: ToastInput) => string;
   success: (message: string, title?: string, duration?: number) => string;
   error: (message: string, title?: string, duration?: number) => string;
@@ -224,8 +223,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<ToastContextValue>(
-    () => ({ toasts, notify, success, error, info, warning, dismiss, clearAll }),
-    [toasts, notify, success, error, info, warning, dismiss, clearAll]
+    () => ({ notify, success, error, info, warning, dismiss, clearAll }),
+    [notify, success, error, info, warning, dismiss, clearAll]
   );
 
   return (

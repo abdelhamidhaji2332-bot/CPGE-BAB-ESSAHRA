@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   ArrowRight,
   BookOpen,
@@ -89,7 +89,9 @@ export function LandingPage({
 
   useEffect(() => {
     let active = true;
-    fetch('/api/classes')
+    const controller = new AbortController();
+
+    fetch('/api/classes', { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error('classes');
         return r.json();
@@ -97,15 +99,15 @@ export function LandingPage({
       .then((data) => {
         if (active && data?.classes) setClasses(data.classes);
       })
-      .catch(() => {
-        if (active) {
+      .catch((err) => {
+        if (active && err?.name !== 'AbortError') {
           toast.error(
             t('Impossible de charger les classes du campus.', 'تعذر تحميل قائمة الأقسام.')
           );
         }
       });
 
-    fetch('/api/documents?category=guides')
+    fetch('/api/documents?category=guides', { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error('guides');
         return r.json();
@@ -113,8 +115,8 @@ export function LandingPage({
       .then((data) => {
         if (active && data?.documents) setGuides(data.documents);
       })
-      .catch(() => {
-        if (active) {
+      .catch((err) => {
+        if (active && err?.name !== 'AbortError') {
           toast.error(
             t('Impossible de charger les guides PDF.', 'تعذر تحميل أدلة PDF.')
           );
@@ -122,6 +124,7 @@ export function LandingPage({
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, [t, toast]);
 
@@ -441,15 +444,7 @@ export function LandingPage({
           </div>
 
           {/* Interactive Selected Class Inspector Panel */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={inspectedDefinition.code}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-5 sm:mt-6 rounded-xl border border-[#c98f4f] bg-[#fcf4e4] p-4 sm:p-6 shadow-sm dark:border-[#5a4634] dark:bg-[#1c1916]"
-            >
+          <div className="mt-5 sm:mt-6 rounded-xl border border-[#c98f4f] bg-[#fcf4e4] p-4 sm:p-6 shadow-sm dark:border-[#5a4634] dark:bg-[#1c1916]">
               <div className="flex flex-col justify-between gap-4 border-b border-[#c98f4f]/35 pb-4 dark:border-[#423428] sm:pb-5 lg:flex-row lg:items-center">
                 <div>
                   <p className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-[#a8532c] dark:text-[#e88c5d]">
@@ -538,8 +533,7 @@ export function LandingPage({
                   ))}
                 </div>
               </div>
-            </motion.div>
-          </AnimatePresence>
+            </div>
         </section>
 
         {/* Row 3 (.row .img-right): La CPGE Bab Sahra */}
