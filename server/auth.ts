@@ -36,6 +36,10 @@ export function isClassModerator(user: AuthUser, classCode: string): boolean {
   return false;
 }
 
+export function canSendClassMessage(user: AuthUser, classCode: string): boolean {
+  return user.role === 'delegue' && user.classCode === classCode;
+}
+
 export function canManageInternat(user: AuthUser): boolean {
   return user.role === 'admin' || user.role === 'maitre_internat';
 }

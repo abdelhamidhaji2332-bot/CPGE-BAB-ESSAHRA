@@ -248,7 +248,7 @@ export function ResourcesPage({
               Ressources académiques du campus
             </h1>
             <p className="mt-2 max-w-2xl text-xs sm:text-sm text-[#4a2e1a]/85 dark:text-[#e3d4b7]">
-              TD, DS, Résumés, annales CNC (Spé) et CF (Spé) classés par filière et matière officielle.
+              Cours, TD, DS, Résumés, annales CNC (Spé) et CF (Spé) classés par filière et matière officielle.
             </p>
           </div>
 
@@ -481,14 +481,14 @@ export function ResourcesPage({
             </p>
             <p className="mt-1.5 font-display text-xl font-semibold text-[#4a2e1a] dark:text-[#f5ebd6]">
               {t(
-                'Coming soon — TD, DS, Résumés, CNC & CF',
-                'قريباً — التمارين، الفروض، الملخصات و CNC / CF'
+                'Coming soon — Cours, TD, DS, Résumés, CNC & CF',
+                'قريباً — الدروس، التمارين، الفروض، الملخصات و CNC / CF'
               )}
             </p>
             <p className="mx-auto mt-1.5 max-w-lg text-xs text-[#4a2e1a]/80 dark:text-[#e3d4b7]">
               {t(
-                'Les supports pédagogiques (TD, DS, résumés, CNC et CF) seront déposés directement ici par les professeurs du campus.',
-                'سيتم نشر التمارين والفروض والملخصات ومواضيع CNC و CF هنا مباشرة من طرف أساتذة الأقسام التحضيرية.'
+                'Les supports pédagogiques (cours, TD, DS, résumés, CNC et CF) seront déposés directement ici par les professeurs du campus.',
+                'سيتم نشر الدروس والتمارين والفروض والملخصات ومواضيع CNC و CF هنا مباشرة من طرف أساتذة الأقسام التحضيرية.'
               )}
             </p>
             {canUpload ? (

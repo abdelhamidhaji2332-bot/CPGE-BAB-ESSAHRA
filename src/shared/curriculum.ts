@@ -19,12 +19,11 @@ export type UserRole =
   | 'groupe_media'
   | 'admin';
 
-export const RESOURCE_CATEGORIES = ['td', 'ds', 'resume', 'cnc', 'cf'] as const;
+export const RESOURCE_CATEGORIES = ['cours', 'td', 'ds', 'resume', 'cnc', 'cf'] as const;
 export type ResourceCategory = (typeof RESOURCE_CATEGORIES)[number];
 
 export type DocumentCategory =
   | ResourceCategory
-  | 'cours'
   | 'concours-blancs'
   | 'corriges'
   | 'colloscopes'
@@ -58,6 +57,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 export const RESOURCE_CATEGORY_LABELS: Record<ResourceCategory, string> = {
+  cours: 'Cours',
   td: 'TD',
   ds: 'DS',
   resume: 'Résumé',

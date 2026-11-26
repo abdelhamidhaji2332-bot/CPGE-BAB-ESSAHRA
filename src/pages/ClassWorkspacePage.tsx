@@ -197,6 +197,9 @@ export function ClassWorkspacePage({
   const [onlineCount, setOnlineCount] = useState(0);
   const [chatError, setChatError] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const canSendMessages = Boolean(
+    user && user.role === 'delegue' && user.classCode === activeClass.code
+  );
 
   useEffect(() => {
     setDayFilter('ALL');
@@ -525,7 +528,7 @@ export function ClassWorkspacePage({
 
   const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!chatInput.trim()) return;
+    if (!canSendMessages || !chatInput.trim()) return;
     setChatError(null);
     const wasAnnouncement = isModerator && sendAsAnnouncement;
     try {
@@ -1394,7 +1397,7 @@ export function ClassWorkspacePage({
                     Canal temps réel · {activeClass.code}
                   </h2>
                   <p className="text-[11px] text-[#4a2e1a]/75 dark:text-[#c8b696]">
-                    Échanges directs entre élèves, délégués et professeurs de la classe
+                    Canal de diffusion de la classe · Envoi réservé au délégué de classe
                   </p>
                 </div>
                 <div className="flex items-center gap-2 font-mono text-xs tabular-nums">
@@ -1435,7 +1438,7 @@ export function ClassWorkspacePage({
               <div className="h-[min(56dvh,420px)] space-y-3 overflow-y-auto bg-[#f7ead0] p-3.5 dark:bg-[#12100e] sm:h-96 sm:p-5">
                 {messages.length === 0 ? (
                   <p className="py-12 text-center text-xs text-[#4a2e1a]/70 dark:text-[#c8b696]">
-                    Aucun message pour le moment dans {activeClass.code}. Lancez la discussion !
+                    Aucun message pour le moment dans {activeClass.code}.
                   </p>
                 ) : (
                   messages.map((msg) => {
@@ -1474,57 +1477,66 @@ export function ClassWorkspacePage({
                 <div ref={chatEndRef} />
               </div>
 
-              {/* Composer */}
-              <form onSubmit={handleSendChat} className="space-y-3 border-t border-[#c98f4f]/50 bg-[#fcf4e4] p-3.5 dark:border-[#5a4634] dark:bg-[#1c1916] sm:p-4">
-                {isModerator ? (
-                  <div className="flex flex-col gap-2 rounded-lg border border-[#c98f4f]/50 bg-[#f7ead0] px-3 py-2 dark:border-[#5a4634] dark:bg-[#26211c] sm:flex-row sm:items-center sm:justify-between">
-                    <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-[#4a2e1a] dark:text-[#f5ebd6]">
-                      <input
-                        type="checkbox"
-                        checked={sendAsAnnouncement}
-                        onChange={(e) => setSendAsAnnouncement(e.target.checked)}
-                      />
-                      <span>
-                        Publier en tant qu’<strong className="text-[#a8532c] dark:text-[#e88c5d]">Annonce Modérateur</strong>{' '}
-                        (épingle dans le chat et synchronise avec Annonces de Classe)
-                      </span>
-                    </label>
-                    {sendAsAnnouncement ? (
-                      <input
-                        type="text"
-                        value={chatAnnTitle}
-                        onChange={(e) => setChatAnnTitle(e.target.value)}
-                        placeholder="Titre de l’annonce (optionnel)"
-                        className="rounded border border-[#c98f4f] bg-[#fcf4e4] px-2.5 py-1 text-xs text-[#4a2e1a] dark:border-[#5a4634] dark:bg-[#1c1916] dark:text-[#f5ebd6] dark:placeholder:text-[#b5a383]"
-                      />
-                    ) : null}
+              {/* Composer (Delegue only) */}
+              {canSendMessages ? (
+                <form onSubmit={handleSendChat} className="space-y-3 border-t border-[#c98f4f]/50 bg-[#fcf4e4] p-3.5 dark:border-[#5a4634] dark:bg-[#1c1916] sm:p-4">
+                  {isModerator ? (
+                    <div className="flex flex-col gap-2 rounded-lg border border-[#c98f4f]/50 bg-[#f7ead0] px-3 py-2 dark:border-[#5a4634] dark:bg-[#26211c] sm:flex-row sm:items-center sm:justify-between">
+                      <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-[#4a2e1a] dark:text-[#f5ebd6]">
+                        <input
+                          type="checkbox"
+                          checked={sendAsAnnouncement}
+                          onChange={(e) => setSendAsAnnouncement(e.target.checked)}
+                        />
+                        <span>
+                          Publier en tant qu’<strong className="text-[#a8532c] dark:text-[#e88c5d]">Annonce Modérateur</strong>{' '}
+                          (épingle dans le chat et synchronise avec Annonces de Classe)
+                        </span>
+                      </label>
+                      {sendAsAnnouncement ? (
+                        <input
+                          type="text"
+                          value={chatAnnTitle}
+                          onChange={(e) => setChatAnnTitle(e.target.value)}
+                          placeholder="Titre de l’annonce (optionnel)"
+                          className="rounded border border-[#c98f4f] bg-[#fcf4e4] px-2.5 py-1 text-xs text-[#4a2e1a] dark:border-[#5a4634] dark:bg-[#1c1916] dark:text-[#f5ebd6] dark:placeholder:text-[#b5a383]"
+                        />
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {chatError ? <p className="text-xs font-semibold text-[#a8532c] dark:text-[#e88c5d]">{chatError}</p> : null}
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder={
+                        sendAsAnnouncement
+                          ? `Diffuser une annonce dans ${activeClass.code}...`
+                          : `Écrire dans ${activeClass.code}...`
+                      }
+                      className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3.5 py-2 text-sm text-[#4a2e1a] placeholder:text-[#4a2e1a]/45 dark:border-[#5a4634] dark:bg-[#26211c] dark:text-[#f5ebd6] dark:placeholder:text-[#b5a383]"
+                    />
+                    <button
+                      type="submit"
+                      aria-label="Envoyer"
+                      className="btn-rust inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 py-2.5 text-xs font-semibold cursor-pointer sm:px-4"
+                    >
+                      <Send className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                      <span className="hidden min-[380px]:inline">Envoyer</span>
+                    </button>
                   </div>
-                ) : null}
-
-                {chatError ? <p className="text-xs font-semibold text-[#a8532c] dark:text-[#e88c5d]">{chatError}</p> : null}
-
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder={
-                      sendAsAnnouncement
-                        ? `Diffuser une annonce dans ${activeClass.code}...`
-                        : `Écrire dans ${activeClass.code}...`
-                    }
-                    className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-[#c98f4f] bg-[#f7ead0] px-3.5 py-2 text-sm text-[#4a2e1a] placeholder:text-[#4a2e1a]/45 dark:border-[#5a4634] dark:bg-[#26211c] dark:text-[#f5ebd6] dark:placeholder:text-[#b5a383]"
-                  />
-                  <button
-                    type="submit"
-                    aria-label="Envoyer"
-                    className="btn-rust inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 py-2.5 text-xs font-semibold cursor-pointer sm:px-4"
-                  >
-                    <Send className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
-                    <span className="hidden min-[380px]:inline">Envoyer</span>
-                  </button>
+                </form>
+              ) : (
+                <div className="flex items-center gap-2.5 border-t border-[#c98f4f]/50 bg-[#fcf4e4] px-4 py-3.5 text-xs text-[#4a2e1a]/80 dark:border-[#5a4634] dark:bg-[#1c1916] dark:text-[#e3d4b7]">
+                  <Lock className="h-4 w-4 shrink-0 text-[#a8532c] dark:text-[#e88c5d]" />
+                  <span>
+                    Seul le <strong>délégué de la classe ({activeClass.code})</strong> est autorisé à envoyer des messages dans ce canal. Les élèves consultent les messages en lecture seule.
+                  </span>
                 </div>
-              </form>
+              )}
             </div>
           )
         ) : null}

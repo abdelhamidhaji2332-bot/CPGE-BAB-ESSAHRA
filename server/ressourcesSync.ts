@@ -60,7 +60,7 @@ function buildReadmeContent(): string {
     'ressources/<CLASSE>/<MATIERE>/<CATEGORIE>/<votre-fichier.pdf>',
     '```',
     '',
-    '- **Catégories disponibles** : `td` (TD), `ds` (DS), `resume` (Résumé), `cnc` (CNC Spé), `cf` (CF Spé)',
+    '- **Catégories disponibles** : `cours` (Cours), `td` (TD), `ds` (DS), `resume` (Résumé), `cnc` (CNC Spé), `cf` (CF Spé)',
     '- **Classes CPGE** :',
     '',
   ];
@@ -90,8 +90,9 @@ export function ensureRessourcesDirectories(): void {
   ensureDir(RESSOURCES_ROOT);
 
   const readmePath = path.join(RESSOURCES_ROOT, 'README.md');
-  if (!fs.existsSync(readmePath)) {
-    fs.writeFileSync(readmePath, buildReadmeContent(), 'utf8');
+  const nextReadme = buildReadmeContent();
+  if (!fs.existsSync(readmePath) || fs.readFileSync(readmePath, 'utf8') !== nextReadme) {
+    fs.writeFileSync(readmePath, nextReadme, 'utf8');
   }
 
   for (const cls of CAMPUS_CLASSES) {

@@ -15,6 +15,7 @@ import {
   canManageCampusLife,
   canManageInternat,
   canManageProfTools,
+  canSendClassMessage,
   hasAdminConfigured,
   hashPassword,
   isClassModerator,
@@ -621,7 +622,7 @@ async function startServer(): Promise<void> {
         }
       } else if (!canManageProfTools(req.user!)) {
         res.status(403).json({
-          error: 'Seuls les professeurs (et l’administration) peuvent publier les TD, DS, résumés, CNC et CF.',
+          error: 'Seuls les professeurs (et l’administration) peuvent publier les cours, TD, DS, résumés, CNC et CF.',
         });
         return;
       }
@@ -758,6 +759,7 @@ async function startServer(): Promise<void> {
         colloscopes: data.colloscopes,
         canAccessPrivate: req.user ? canAccessClassWorkspace(req.user, code) : false,
         isModerator: req.user ? isClassModerator(req.user, code) : false,
+        canSendMessages: req.user ? canSendClassMessage(req.user, code) : false,
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message || 'Impossible de charger la classe.' });
@@ -785,6 +787,7 @@ async function startServer(): Promise<void> {
         announcements: data.announcements,
         messages: data.messages,
         isModerator: isClassModerator(req.user!, code),
+        canSendMessages: canSendClassMessage(req.user!, code),
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message || 'Impossible de charger l’espace classe.' });
@@ -886,8 +889,10 @@ async function startServer(): Promise<void> {
   app.post('/api/classes/:classCode/messages', requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const code = req.params.classCode.toUpperCase();
-      if (!isValidClassCode(code) || !canAccessClassWorkspace(req.user!, code)) {
-        res.status(403).json({ error: 'Accès au chat réservé aux membres de la classe.' });
+      if (!isValidClassCode(code) || !canSendClassMessage(req.user!, code)) {
+        res.status(403).json({
+          error: 'Seul le délégué de la classe est autorisé à envoyer des messages dans ce canal.',
+        });
         return;
       }
       const parsed = chatMessageSchema.safeParse(req.body);

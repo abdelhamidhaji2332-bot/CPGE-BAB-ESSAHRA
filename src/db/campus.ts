@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gt, ilike, inArray, isNotNull, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
+import { RESOURCE_CATEGORIES } from '../shared/curriculum.ts';
 import { db } from './index.ts';
 import {
   adminAnnouncements,
@@ -199,7 +200,7 @@ export async function listDocumentsWithProgress(params: {
     if (params.category) {
       filters.push(eq(documents.category, params.category));
     } else if (params.scope === 'ressources') {
-      filters.push(inArray(documents.category, ['td', 'ds', 'resume', 'cnc', 'cf']));
+      filters.push(inArray(documents.category, [...RESOURCE_CATEGORIES]));
     }
 
     if (params.subjectSlug) {
